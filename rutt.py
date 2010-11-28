@@ -8,7 +8,7 @@ import feedparser
 
 class Database(object):
     def __init__(self):
-        self.conn = sqlite3.connect('config/rsscurses.db')
+        self.conn = sqlite3.connect('config/rutt.db')
         self.c = self.conn.cursor()
 
         self.create_tables()
@@ -32,7 +32,7 @@ class Database(object):
                           title text,
                           url text,
                           description text,
-                          read int default 1,
+                          read int default 0,
                           UNIQUE(url),
                           FOREIGN KEY(feed_id) REFERENCES feeds(id))''')
 
@@ -51,10 +51,10 @@ class Database(object):
         for row in rows:
             (feed_id, title, url) = row
 
-            self.c.execute('''select count(*) as read_items from items where feed_id = ? and read = 1''', (feed_id,))
+            self.c.execute('''select count(*) as read_items from items where feed_id = ? and read = 0''', (feed_id,))
             (new_items,) = self.c.fetchone()
 
-            self.c.execute('''select count(*) as read_items from items where feed_id = ? and read = 0''', (feed_id,))
+            self.c.execute('''select count(*) as read_items from items where feed_id = ? and read = 1''', (feed_id,))
             (read_items,) = self.c.fetchone()
 
             yield {
@@ -68,7 +68,7 @@ class Database(object):
     def update_feeds(self):
         items = []
 
-        for item in get_feeds():
+        for item in self.get_feeds():
             url_feed = feedparser.parse(item['url'])
 
             for entry in url_feed.entries:
@@ -251,7 +251,13 @@ def open_config():
     global config
 
     config = Database()
-    # config.update_feeds()
+
+    # add_url("http://www.planetpostgresql.org/atom.xml")
+    config.add_feed("http://feeds2.feedburner.com/al3x")
+    config.add_feed("http://www.allthingsdistributed.com/atom.xml")
+    config.add_feed("http://antirez.com/rss")
+
+    config.update_feeds()
 
 def start_screen():
     stdscr = curses.initscr()
@@ -277,13 +283,6 @@ def start_screen():
 
 def main():
     open_config()
-#    add_url("http://www.planetpostgresql.org/atom.xml")
-    # add_url("http://feeds2.feedburner.com/al3x")
-    # add_url("http://www.allthingsdistributed.com/atom.xml")
-    # add_url("http://antirez.com/rss")
-
-
-
 
     # Start the thing.
     start_screen()
