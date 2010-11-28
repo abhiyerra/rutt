@@ -5,6 +5,7 @@ import curses
 import sys
 import sqlite3
 import feedparser
+import time
 
 class Database(object):
     def __init__(self):
@@ -23,7 +24,9 @@ class Database(object):
                           id integer PRIMARY KEY,
                           title text,
                           url text,
-                          interval integer,
+                          interval integer default 3600,
+                          created_at NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                          updated_at NOT NULL DEFAULT CURRENT_TIMESTAMP,
                           UNIQUE(url))''')
 
         self.c.execute('''create table if not exists items (
@@ -33,6 +36,8 @@ class Database(object):
                           url text,
                           description text,
                           read int default 0,
+                          created_at NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                          updated_at NOT NULL DEFAULT CURRENT_TIMESTAMP,
                           UNIQUE(url),
                           FOREIGN KEY(feed_id) REFERENCES feeds(id))''')
 
@@ -40,16 +45,16 @@ class Database(object):
         url_feed = feedparser.parse(url)
         title =  url_feed.feed.title
 
-        self.c.execute('''insert into feeds (title, url) values (?, ?)''', (title, url))
+        self.c.execute('''insert or ignore into feeds (title, url) values (?, ?)''', (title, url))
         self.conn.commit()
 
 
     def get_feeds(self):
-        self.c.execute('''select id, title, url from feeds''')
+        self.c.execute('''select id, title, url, strftime('%s', updated_at), interval from feeds''')
         rows = self.c.fetchall()
 
         for row in rows:
-            (feed_id, title, url) = row
+            (feed_id, title, url, updated_at, interval) = row
 
             self.c.execute('''select count(*) as read_items from items where feed_id = ? and read = 0''', (feed_id,))
             (new_items,) = self.c.fetchone()
@@ -62,35 +67,44 @@ class Database(object):
                 'title': title,
                 'url': url,
                 'new': new_items,
-                'read': read_items
+                'read': read_items,
+                'updated_at': updated_at,
+                'interval': interval
                 }
 
     def update_feeds(self):
         items = []
 
         for item in self.get_feeds():
+
+            # Yuck. Must be a better way to do this...
+            if (int(time.strftime('%s', time.gmtime())) - int(item['updated_at'])) > int(item['interval']):
+                break
+
+
             url_feed = feedparser.parse(item['url'])
 
             for entry in url_feed.entries:
                 print entry.title
                 print entry.link
 
-                self.c.execute('''insert or replace into items (feed_id, url, title, description) values (?, ?, ?, ?)''', (item['feed_id'], entry.link, entry.title, ''))
+                self.c.execute('''insert or ignore into items (feed_id, url, title, description) values (?, ?, ?, ?)''', (item['feed_id'], entry.link, entry.title, ''))
 
         self.conn.commit()
 
     def get_items(self, feed_id):
-        self.c.execute('''select id, title, url, read from items where feed_id = ? order by id desc''', (feed_id))
+        self.c.execute('''select id, title, url, read, updated_at from items where feed_id = ? order by id desc''', (feed_id))
         rows = self.c.fetchall()
 
         for row in rows:
-            (item_id, title, url, read) = row
+            (item_id, title, url, read, updated_at) = row
 
             yield {
                 'item_id': item_id,
                 'title': title,
                 'url': url,
                 'read': (read == 1),
+                'updated_at': updated_at,
                 }
 
     def get_item(self, item_id):
@@ -104,7 +118,7 @@ class Database(object):
             }
 
     def mark_item_as_read(self, item_id):
-        self.c.execute('''update items set read = 1 where id = ?''', (item_id,))
+        self.c.execute('''update items set read = 1, updated_at = datetime('now') where id = ?''', (item_id,))
         self.conn.commit()
 
 class Screen(object):
@@ -128,7 +142,11 @@ class FeedScreen(Screen):
         global config
 
         for item in config.get_feeds():
-            self.stdscr.addstr("%d\t%d/%d\t%s\n" % (item['feed_id'], item['new'], item['new'] + item['read'], item['title']))
+            self.stdscr.addstr("\t%d\t%d/%d\t%s\t%s\n" % (item['feed_id'],
+                                                        item['new'],
+                                                        item['new'] + item['read'],
+                                                        item['title'],
+                                                        item['updated_at']))
 
         self.stdscr.addstr("-> ")
         self.stdscr.refresh()
@@ -174,7 +192,7 @@ class ItemScreen(Screen):
         global config
 
         for item in config.get_items(self.feed_id):
-            self.stdscr.addstr("%d\t%s\t%s\n" % (item['item_id'], 'N' if item['read'] else ' ', item['title']))
+            self.stdscr.addstr("\t%d\t%s\t%s\n" % (item['item_id'], 'N' if not item['read'] else ' ', item['title']))
 
         self.stdscr.addstr("-> ")
         self.stdscr.refresh()
