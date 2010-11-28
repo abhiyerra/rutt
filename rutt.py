@@ -2,6 +2,7 @@
 
 import os
 import curses
+import curses.wrapper
 import sys
 import sqlite3
 import feedparser
@@ -125,7 +126,7 @@ class Screen(object):
     def __init__(self, stdscr):
         self.stdscr = stdscr
 
-        self.mix_y = 1
+        self.min_y = 1
         self.max_y = curses.LINES
 
         self.cur_y = 1
@@ -133,37 +134,42 @@ class Screen(object):
 
     def display_menu(self):
         self.stdscr.clear()
-        self.stdscr.addstr(0, 0, "rsscurses a:Add feed R:Refresh q:Quit\n", curses.A_REVERSE)
+        self.stdscr.addstr(0, 0, " rutt a:Add feed R:Refresh q:Quit\n", curses.A_REVERSE)
+
+    def move_pointer(self, pos):
+        self.stdscr.addstr(self.cur_y, 0, " ")
+
+        self.cur_y += pos
+        self.stdscr.addstr(self.cur_y, 0, ">", curses.A_REVERSE)
 
 
 class FeedScreen(Screen):
+    def __init__(self, stdscr):
+        self.feeds = {}
+        super(FeedScreen, self).__init__(stdscr)
 
     def display_feeds(self):
         global config
 
-        for item in config.get_feeds():
-            self.stdscr.addstr("\t%d\t%d/%d\t%s\t%s\n" % (item['feed_id'],
-                                                        item['new'],
-                                                        item['new'] + item['read'],
-                                                        item['title'],
-                                                        item['updated_at']))
+        self.cur_y = self.min_y
 
-        self.stdscr.addstr("-> ")
+        for item in config.get_feeds():
+            self.stdscr.addstr(self.cur_y, 0, "  %d/%d\t\t%s\n" % (item['new'],
+                                                                   item['new'] + item['read'],
+                                                                   item['title'],))
+            self.feeds[self.cur_y] = item['feed_id']
+            self.cur_y += 1
+
+        self.cur_y = self.min_y
         self.stdscr.refresh()
 
-        curses.echo()
-
-    def go_up(self):
-        pass
-
-    def go_down(self):
-        pass
 
     def loop(self):
-        while True:
-            self.display_menu()
-            self.display_feeds()
+        self.display_menu()
+        self.display_feeds()
+        self.move_pointer(0)
 
+        while True:
             c = self.stdscr.getch()
             if 0 < c < 256:
                 if chr(c) in 'Qq':
@@ -172,49 +178,54 @@ class FeedScreen(Screen):
                     pass
                 elif chr(c) in 'Rr':
                     pass
-                elif chr(c) in 'Jj':
-                    self.go_up()
-                elif chr(c) in 'Kk':
-                    self.go_down()
-                else:
-                    item_screen = ItemScreen(self.stdscr, chr(c))
+                elif chr(c) == ' ':
+                    item_screen = ItemScreen(self.stdscr, str(self.feeds[self.cur_y]))
                     item_screen.loop()
             else:
-                pass
+                if c == curses.KEY_UP:
+                    self.move_pointer(-1)
+                elif c == curses.KEY_DOWN:
+                    self.move_pointer(1)
 
 class ItemScreen(Screen):
     def __init__(self, stdscr, feed_id):
         self.feed_id = feed_id
+        self.items = {}
 
         super(ItemScreen, self).__init__(stdscr)
 
     def display_items(self):
         global config
 
-        for item in config.get_items(self.feed_id):
-            self.stdscr.addstr("\t%d\t%s\t%s\n" % (item['item_id'], 'N' if not item['read'] else ' ', item['title']))
+        self.cur_y = self.min_y
 
-        self.stdscr.addstr("-> ")
+        for item in config.get_items(self.feed_id):
+            self.stdscr.addstr(self.cur_y, 0, "  %s\t%s\n" % ('N' if not item['read'] else ' ', item['title']))
+
+            self.items[self.cur_y] = item['item_id']
+            self.cur_y += 1
+
+        self.cur_y = self.min_y
         self.stdscr.refresh()
 
-        curses.echo()
-
     def loop(self):
-        while True:
-            self.display_menu()
-            self.display_items()
+        self.display_menu()
+        self.display_items()
+        self.move_pointer(0)
 
+        while True:
             c = self.stdscr.getch()
             if 0 < c < 256:
                 if chr(c) in 'Qq':
                     break
-                elif chr(c) in 'Jj':
-                    go_up()
-                elif chr(c) in 'Kk':
-                    go_down()
-                else:
-                    content_screen = ContentScreen(self.stdscr, chr(c))
+                elif chr(c) == ' ':
+                    content_screen = ContentScreen(self.stdscr, self.items[self.cur_y])
                     content_screen.loop()
+            else:
+                if c == curses.KEY_UP:
+                    self.move_pointer(-1)
+                elif c == curses.KEY_DOWN:
+                    self.move_pointer(1)
 
 class ContentScreen(Screen):
     def __init__(self, stdscr, item_id):
@@ -238,7 +249,7 @@ class ContentScreen(Screen):
         cur_line = 1
         while cur_line < (curses.LINES - 5):
             if len(self.content) > 0:
-                self.stdscr.addstr("%s\n" % self.content.pop())
+                self.stdscr.addstr("  %s\n" % self.content.pop())
             else:
                 self.stdscr.addstr("\n")
 
@@ -260,8 +271,12 @@ class ContentScreen(Screen):
                     break
                 elif chr(c) in ' ':
                     continue
-                else:
-                    pass
+            else:
+                if c == curses.KEY_UP:
+                    self.move_pointer(-1)
+                elif c == curses.KEY_DOWN:
+                    self.move_pointer(1)
+
 
 
 config = None
@@ -271,17 +286,19 @@ def open_config():
     config = Database()
 
     # add_url("http://www.planetpostgresql.org/atom.xml")
-    config.add_feed("http://feeds2.feedburner.com/al3x")
-    config.add_feed("http://www.allthingsdistributed.com/atom.xml")
-    config.add_feed("http://antirez.com/rss")
+    # config.add_feed("http://feeds2.feedburner.com/al3x")
+    # config.add_feed("http://www.allthingsdistributed.com/atom.xml")
+    # config.add_feed("http://antirez.com/rss")
 
-    config.update_feeds()
+    # config.update_feeds()
 
 def start_screen():
     stdscr = curses.initscr()
 
     curses.start_color()
-    curses.init_pair(1, curses.COLOR_YELLOW, curses.COLOR_BLUE)
+    curses.init_pair(1, curses.COLOR_GREEN, curses.COLOR_BLACK)
+    curses.init_pair(2, curses.COLOR_YELLOW, curses.COLOR_BLACK)
+    curses.init_pair(3, curses.COLOR_RED, curses.COLOR_BLACK)
 
     curses.noecho()
     curses.cbreak()
