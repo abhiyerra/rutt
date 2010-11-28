@@ -181,6 +181,12 @@ class FeedScreen(Screen):
                 elif chr(c) == ' ':
                     item_screen = ItemScreen(self.stdscr, str(self.feeds[self.cur_y]))
                     item_screen.loop()
+
+                    self.stdscr.clear()
+
+                    self.display_menu()
+                    self.display_feeds()
+                    self.move_pointer(self.min_y)
             else:
                 if c == curses.KEY_UP:
                     self.move_pointer(-1)
@@ -221,11 +227,19 @@ class ItemScreen(Screen):
                 elif chr(c) == ' ':
                     content_screen = ContentScreen(self.stdscr, self.items[self.cur_y])
                     content_screen.loop()
+
+                    self.stdscr.clear()
+
+                    self.display_menu()
+                    self.display_items()
+                    self.move_pointer(0)
             else:
                 if c == curses.KEY_UP:
                     self.move_pointer(-1)
                 elif c == curses.KEY_DOWN:
                     self.move_pointer(1)
+
+
 
 class ContentScreen(Screen):
     def __init__(self, stdscr, item_id):
@@ -238,7 +252,7 @@ class ContentScreen(Screen):
         self.item = config.get_item(self.item_id)
         config.mark_item_as_read(self.item_id)
 
-        render_cmd = "lynx -dump -force_html %s" % self.item['url']
+        render_cmd = "elinks -dump -force-html %s" % self.item['url']
         self.content = os.popen(render_cmd).read().split("\n")
         self.content.reverse()
 
