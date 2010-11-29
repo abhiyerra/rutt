@@ -291,7 +291,6 @@ class ContentScreen(Screen):
 
         render_cmd = "elinks -dump -force-html %s" % self.item['url']
         self.content = os.popen(render_cmd).read().split("\n")
-        self.content.reverse()
 
     def move_pointer(self, pos):
         if self.cur_line + pos < 0:
