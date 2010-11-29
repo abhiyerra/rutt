@@ -53,8 +53,8 @@ class Database(object):
         self.conn.commit()
 
 
-    def get_feeds(self):
-        self.c.execute('''select id, title, url, strftime('%s', updated_at), interval from feeds''')
+    def get_feeds(self, limit):
+        self.c.execute('''select id, title, url, strftime('%s', updated_at), interval from feeds limit ?, ?''', limit)
         rows = self.c.fetchall()
 
         for row in rows:
@@ -79,7 +79,7 @@ class Database(object):
     def update_feeds(self):
         items = []
 
-        for item in self.get_feeds():
+        for item in self.get_feeds(limit=(0, -1)):
             # Yuck. Must be a better way to do this...
             #if (int(time.strftime('%s', time.gmtime())) - int(item['updated_at'])) > int(item['interval']):
             #    break
@@ -95,7 +95,7 @@ class Database(object):
         self.conn.commit()
 
     def get_items(self, feed_id):
-        self.c.execute('''select id, title, url, read, updated_at from items where feed_id = ? order by id desc''', (feed_id))
+        self.c.execute('''select id, title, url, read, updated_at from items where feed_id = ? order by id desc''', (feed_id,))
         rows = self.c.fetchall()
 
         for row in rows:
@@ -135,7 +135,7 @@ class Screen(object):
 
     def display_menu(self):
         self.stdscr.clear()
-        self.stdscr.addstr(0, 0, " rutt a:Add feed R:Refresh q:Quit\n", curses.A_REVERSE)
+        self.stdscr.addstr(0, 0, " rutt n:Next Page p:Prev Page a:Add feed R:Refresh q:Quit\n", curses.A_REVERSE)
 
     def move_pointer(self, pos):
         self.stdscr.addstr(self.cur_y, 0, " ")
@@ -154,11 +154,12 @@ class FeedScreen(Screen):
 
         self.cur_y = self.min_y
 
-        for item in config.get_feeds():
+        for item in config.get_feeds(limit=self.limit):
             self.stdscr.addstr(self.cur_y, 0, "  %d/%d\t\t%s\n" % (item['new'],
                                                                    item['new'] + item['read'],
                                                                    item['title'],))
             self.feeds[self.cur_y] = item['feed_id']
+
             self.cur_y += 1
 
         self.cur_y = self.min_y
@@ -166,6 +167,7 @@ class FeedScreen(Screen):
 
 
     def loop(self):
+        self.limit = (0, curses.LINES - 2)
         self.display_menu()
         self.display_feeds()
         self.move_pointer(0)
@@ -179,8 +181,20 @@ class FeedScreen(Screen):
                     pass
                 elif chr(c) in 'Rr':
                     pass
+                elif chr(c) in 'Pp':
+                    self.limit = (self.limit[0] - curses.LINES - 2, self.limit[0])
+                    self.stdscr.clear()
+                    self.display_menu()
+                    self.display_feeds()
+                    self.move_pointer(0)
+                elif chr(c) in 'Nn':
+                    self.limit = (self.limit[1], self.limit[1] + curses.LINES - 2)
+                    self.stdscr.clear()
+                    self.display_menu()
+                    self.display_feeds()
+                    self.move_pointer(0)
                 elif chr(c) == ' ':
-                    item_screen = ItemScreen(self.stdscr, str(self.feeds[self.cur_y]))
+                    item_screen = ItemScreen(self.stdscr, self.feeds[self.cur_y])
                     item_screen.loop()
 
                     self.stdscr.clear()
@@ -292,10 +306,7 @@ class ContentScreen(Screen):
                 elif c == curses.KEY_DOWN:
                     self.move_pointer(1)
 
-
-
 config = None
-
 
 def start_screen():
     stdscr = curses.initscr()
@@ -330,7 +341,11 @@ if __name__ == '__main__':
 
     if args.add is not None:
         for url in args.add:
-            config.add_feed(url)
+            try:
+                config.add_feed(url)
+            except:
+                print "Failed to add %s" % url
+
         sys.exit()
 
     if args.reload is True:
