@@ -94,8 +94,8 @@ class Database(object):
 
         self.conn.commit()
 
-    def get_items(self, feed_id):
-        self.c.execute('''select id, title, url, read, updated_at from items where feed_id = ? order by id desc''', (feed_id,))
+    def get_items(self, feed_id, limit):
+        self.c.execute('''select id, title, url, read, updated_at from items where feed_id = ? order by id desc limit ?, ?''', (feed_id, limit[0], limit[1],))
         rows = self.c.fetchall()
 
         for row in rows:
@@ -220,7 +220,7 @@ class ItemScreen(Screen):
 
         self.cur_y = self.min_y
 
-        for item in config.get_items(self.feed_id):
+        for item in config.get_items(self.feed_id, limit=self.limit):
             self.stdscr.addstr(self.cur_y, 0, "  %s\t%s\n" % ('N' if not item['read'] else ' ', item['title']))
 
             self.items[self.cur_y] = item['item_id']
@@ -230,6 +230,7 @@ class ItemScreen(Screen):
         self.stdscr.refresh()
 
     def loop(self):
+        self.limit = (0, curses.LINES - 2)
         self.display_menu()
         self.display_items()
         self.move_pointer(0)
@@ -239,6 +240,18 @@ class ItemScreen(Screen):
             if 0 < c < 256:
                 if chr(c) in 'Qq':
                     break
+                elif chr(c) in 'Pp':
+                    self.limit = (self.limit[0] - curses.LINES - 2, self.limit[0])
+                    self.stdscr.clear()
+                    self.display_menu()
+                    self.display_items()
+                    self.move_pointer(0)
+                elif chr(c) in 'Nn':
+                    self.limit = (self.limit[1], self.limit[1] + curses.LINES - 2)
+                    self.stdscr.clear()
+                    self.display_menu()
+                    self.display_items()
+                    self.move_pointer(0)
                 elif chr(c) == ' ':
                     content_screen = ContentScreen(self.stdscr, self.items[self.cur_y])
                     content_screen.loop()
@@ -267,32 +280,36 @@ class ContentScreen(Screen):
         self.item = config.get_item(self.item_id)
         config.mark_item_as_read(self.item_id)
 
-        render_cmd = "elinks -dump -force-html %s" % self.item['url']
+        render_cmd = "elinks -dump -no-numbering -force-html %s" % self.item['url']
         self.content = os.popen(render_cmd).read().split("\n")
         self.content.reverse()
 
-    def display_content(self):
-        self.stdscr.addstr("%s\n" % self.item['title'])
-        self.stdscr.addstr("%s\n\n" % self.item['url'])
+    def move_pointer(self, pos):
+        if self.cur_line + pos < 0:
+            return
 
-        cur_line = 1
-        while cur_line < (curses.LINES - 5):
-            if len(self.content) > 0:
-                self.stdscr.addstr("  %s\n" % self.content.pop())
-            else:
-                self.stdscr.addstr("\n")
+        self.stdscr.addstr(1, 2, "%s (%s)\n" % (self.item['title'], self.item['url']), curses.A_BOLD)
 
-            cur_line += 1
+        self.cur_line = self.cur_line + pos
+
+        lines = self.content[self.cur_line:self.cur_line + curses.LINES - 5]
+        cur_y = 2
+        for line in lines:
+            self.stdscr.addstr(cur_y, 2, "%s\n" % line)
+            cur_y += 1
+
+        self.stdscr.refresh()
 
     def loop(self):
+        self.cur_line = 0
         self.get_content()
 
         while True:
             self.stdscr.clear()
             self.display_menu()
 
-            self.display_content()
-            self.stdscr.refresh()
+            self.move_pointer(0)
+
 
             c = self.stdscr.getch()
             if 0 < c < 256:
