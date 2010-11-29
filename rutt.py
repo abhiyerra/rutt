@@ -7,6 +7,8 @@ import sys
 import sqlite3
 import feedparser
 import time
+import argparse
+import sys
 
 class Database(object):
     def __init__(self):
@@ -37,6 +39,7 @@ class Database(object):
                           url text,
                           description text,
                           read int default 0,
+                          prioritize int default 0,
                           created_at NOT NULL DEFAULT CURRENT_TIMESTAMP,
                           updated_at NOT NULL DEFAULT CURRENT_TIMESTAMP,
                           UNIQUE(url),
@@ -65,7 +68,7 @@ class Database(object):
 
             yield {
                 'feed_id': feed_id,
-                'title': title,
+                'title': title.encode('ascii','ignore'),
                 'url': url,
                 'new': new_items,
                 'read': read_items,
@@ -77,11 +80,9 @@ class Database(object):
         items = []
 
         for item in self.get_feeds():
-
             # Yuck. Must be a better way to do this...
-            if (int(time.strftime('%s', time.gmtime())) - int(item['updated_at'])) > int(item['interval']):
-                break
-
+            #if (int(time.strftime('%s', time.gmtime())) - int(item['updated_at'])) > int(item['interval']):
+            #    break
 
             url_feed = feedparser.parse(item['url'])
 
@@ -102,7 +103,7 @@ class Database(object):
 
             yield {
                 'item_id': item_id,
-                'title': title,
+                'title': title.encode('ascii','ignore'),
                 'url': url,
                 'read': (read == 1),
                 'updated_at': updated_at,
@@ -294,17 +295,7 @@ class ContentScreen(Screen):
 
 
 config = None
-def open_config():
-    global config
 
-    config = Database()
-
-    # add_url("http://www.planetpostgresql.org/atom.xml")
-    # config.add_feed("http://feeds2.feedburner.com/al3x")
-    # config.add_feed("http://www.allthingsdistributed.com/atom.xml")
-    # config.add_feed("http://antirez.com/rss")
-
-    # config.update_feeds()
 
 def start_screen():
     stdscr = curses.initscr()
@@ -329,14 +320,21 @@ def start_screen():
     curses.nocbreak()
     curses.endwin()
 
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="rutt - Mutt like RSS/Atom reader")
+    parser.add_argument('-a', '--add', nargs='+', help="Add a new feed.", metavar="url")
+    parser.add_argument('-r', '--reload', action='store_true', help="Update feeds.")
+    args = parser.parse_args()
 
-def main():
-    open_config()
+    config = Database()
 
-    # Start the thing.
+    if args.add is not None:
+        for url in args.add:
+            config.add_feed(url)
+        sys.exit()
+
+    if args.reload is True:
+        config.update_feeds()
+        sys.exit()
+
     start_screen()
-
-
-main()
-
-
