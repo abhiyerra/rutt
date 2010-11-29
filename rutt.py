@@ -289,7 +289,7 @@ class ContentScreen(Screen):
         self.item = config.get_item(self.item_id)
         config.mark_item_as_read(self.item_id)
 
-        render_cmd = "elinks -dump -no-numbering -force-html %s" % self.item['url']
+        render_cmd = "elinks -dump -force-html %s" % self.item['url']
         self.content = os.popen(render_cmd).read().split("\n")
         self.content.reverse()
 
@@ -313,23 +313,27 @@ class ContentScreen(Screen):
         self.cur_line = 0
         self.get_content()
 
+        self.stdscr.clear()
+        self.display_menu()
+        self.move_pointer(0)
+
         while True:
-            self.stdscr.clear()
-            self.display_menu()
-
-            self.move_pointer(0)
-
-
             c = self.stdscr.getch()
             if 0 < c < 256:
                 if chr(c) in 'Qq':
                     break
                 elif chr(c) in ' ':
-                    continue
+                    self.stdscr.clear()
+                    self.display_menu()
+                    self.move_pointer(10)
             else:
                 if c == curses.KEY_UP:
+                    self.stdscr.clear()
+                    self.display_menu()
                     self.move_pointer(-1)
                 elif c == curses.KEY_DOWN:
+                    self.stdscr.clear()
+                    self.display_menu()
                     self.move_pointer(1)
 
 config = None
