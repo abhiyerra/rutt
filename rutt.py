@@ -230,7 +230,7 @@ class ItemScreen(Screen):
         self.cur_y = self.min_y
 
         for item in config.get_items(self.feed_id, limit=self.limit):
-            self.stdscr.addstr(self.cur_y, 0, "  %s\t%s\t%s\n" % ('N' if not item['read'] else ' ', item['published'], item['title']))
+            self.stdscr.addstr(self.cur_y, 0, "  %s\t%s\t%s\n" % ('N' if not item['read'] else ' ', item['published'][0:16].replace('T', ' '), item['title']))
 
             self.items[self.cur_y] = item['item_id']
             self.cur_y += 1
