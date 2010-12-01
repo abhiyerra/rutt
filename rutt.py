@@ -9,6 +9,7 @@ import feedparser
 import time
 import argparse
 import sys
+import calendar
 
 class Database(object):
     def __init__(self):
@@ -40,7 +41,7 @@ class Database(object):
                           description text,
                           read int default 0,
                           prioritize int default 0,
-                          entry_published NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                          published_at DATE NOT NULL DEFAULT (datetime('now','localtime')),
                           created_at NOT NULL DEFAULT CURRENT_TIMESTAMP,
                           updated_at NOT NULL DEFAULT CURRENT_TIMESTAMP,
                           UNIQUE(url),
@@ -90,35 +91,37 @@ class Database(object):
             for entry in url_feed.entries:
                 print entry.title
                 print entry.link
-                created_at = None
+                published_at = None
                 if entry.has_key('updated'):
-                    created_at = entry.updated
+                    published_at = entry.updated_parsed
                 elif entry.has_key('published'):
-                    created_at = entry.published
+                    published_at = entry.published_parsed
                 elif entry.has_key('created'):
-                    created_at = entry.created
+                    published_at = entry.created_parsed
 
-                self.c.execute('''insert or ignore into items (feed_id, url, title, description, entry_published) values (?, ?, ?, ?, ?)''', (item['feed_id'], entry.link, entry.title, '', created_at,))
+                published_at = calendar.timegm(published_at)
+
+                self.c.execute('''insert or ignore into items (feed_id, url, title, description, published_at) values (?, ?, ?, ?, ?)''', (item['feed_id'], entry.link, entry.title, '', published_at,))
 
         self.conn.commit()
 
     def get_items(self, feed_id, limit):
-        self.c.execute('''select id, title, url, read, entry_published, updated_at from items where feed_id = ? order by entry_published desc limit ?, ?''', (feed_id, limit[0], limit[1],))
+        self.c.execute('''select id, title, url, read, datetime(published_at, 'unixepoch'), updated_at from items where feed_id = ? order by published_at desc limit ?, ?''', (feed_id, limit[0], limit[1],))
         rows = self.c.fetchall()
 
         for row in rows:
-            (item_id, title, url, read, entry_published, updated_at) = row
+            (item_id, title, url, read, published_at, updated_at) = row
 
             yield {
                 'item_id': item_id,
                 'title': title.encode('ascii','ignore'),
                 'url': url,
                 'read': (read == 1),
-                'published': entry_published,
+                'published': published_at,
                 }
 
     def get_item(self, item_id):
-        self.c.execute('''select id, title, url, entry_published from items where id = ?''', (item_id,))
+        self.c.execute('''select id, title, url, published_at from items where id = ?''', (item_id,))
         (item_id, title, url, published) = self.c.fetchone()
 
         return {
@@ -230,7 +233,7 @@ class ItemScreen(Screen):
         self.cur_y = self.min_y
 
         for item in config.get_items(self.feed_id, limit=self.limit):
-            self.stdscr.addstr(self.cur_y, 0, "  %s\t%s\t%s\n" % ('N' if not item['read'] else ' ', item['published'][0:16].replace('T', ' '), item['title']))
+            self.stdscr.addstr(self.cur_y, 0, "  %s\t%s\t%s\n" % ('N' if not item['read'] else ' ', item['published'], item['title']))
 
             self.items[self.cur_y] = item['item_id']
             self.cur_y += 1
@@ -247,7 +250,7 @@ class ItemScreen(Screen):
         while True:
             c = self.stdscr.getch()
             if 0 < c < 256:
-                if chr(c) in 'Qq':
+                if chr(c) in 'Ii':
                     break
                 elif chr(c) in 'Pp':
                     self.limit = (self.limit[0] - curses.LINES - 2, self.limit[0])
@@ -319,7 +322,7 @@ class ContentScreen(Screen):
         while True:
             c = self.stdscr.getch()
             if 0 < c < 256:
-                if chr(c) in 'Qq':
+                if chr(c) in 'Ii':
                     break
                 elif chr(c) in ' ':
                     self.stdscr.clear()
