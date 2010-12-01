@@ -1,15 +1,15 @@
 #!/usr/bin/env python
 
-import os
+import argparse
+import calendar
 import curses
 import curses.wrapper
-import sys
-import sqlite3
 import feedparser
-import time
-import argparse
+import os
+import sqlite3
 import sys
-import calendar
+import time
+import webbrowser
 
 class Database(object):
     def __init__(self):
@@ -324,6 +324,8 @@ class ContentScreen(Screen):
             if 0 < c < 256:
                 if chr(c) in 'Ii':
                     break
+                elif chr(c) in 'Bb':
+                    webbrowser.open_new_tab(self.item['url'])
                 elif chr(c) in ' ':
                     self.stdscr.clear()
                     self.display_menu()
