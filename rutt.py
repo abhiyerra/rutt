@@ -103,7 +103,7 @@ class Database(object):
 
                 self.c.execute('''insert or ignore into items (feed_id, url, title, description, published_at) values (?, ?, ?, ?, ?)''', (item['feed_id'], entry.link, entry.title, '', published_at,))
 
-        self.conn.commit()
+            self.conn.commit()
 
     def get_items(self, feed_id, limit):
         self.c.execute('''select id, title, url, read, datetime(published_at, 'unixepoch'), updated_at from items where feed_id = ? order by published_at desc limit ?, ?''', (feed_id, limit[0], limit[1],))
