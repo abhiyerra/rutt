@@ -10,130 +10,74 @@ import sqlite3
 import sys
 import time
 import webbrowser
-
-class Database(object):
-    def __init__(self):
-        self.conn = sqlite3.connect('config/rutt.db')
-        self.c = self.conn.cursor()
-
-        self.create_tables()
-
-        self.conn.commit()
-
-    def close(self):
-        self.c.close()
-
-    def create_tables(self):
-        self.c.execute('''create table if not exists feeds (
-                          id integer PRIMARY KEY,
-                          title text,
-                          url text,
-                          interval integer default 3600,
-                          created_at NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                          updated_at NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                          UNIQUE(url))''')
-
-        self.c.execute('''create table if not exists items (
-                          id integer PRIMARY KEY,
-                          feed_id integer,
-                          title text,
-                          url text,
-                          description text,
-                          read int default 0,
-                          prioritize int default 0,
-                          published_at DATE NOT NULL DEFAULT (datetime('now','localtime')),
-                          created_at NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                          updated_at NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                          UNIQUE(url),
-                          FOREIGN KEY(feed_id) REFERENCES feeds(id))''')
-
-    def add_feed(self, url):
-        url_feed = feedparser.parse(url)
-        title =  url_feed.feed.title
-
-        self.c.execute('''insert or ignore into feeds (title, url) values (?, ?)''', (title, url))
-        self.conn.commit()
+import datetime
+from elixir import *
 
 
-    def get_feeds(self, limit):
-        self.c.execute('''select id, title, url, strftime('%s', updated_at), interval from feeds limit ?, ?''', limit)
-        rows = self.c.fetchall()
+class Feed(Entity):
+    id = Field(Integer, primary_key=True)
+    items = OneToMany('FeedItem')
 
-        for row in rows:
-            (feed_id, title, url, updated_at, interval) = row
+    title = Field(String(255))
+    url = Field(String(255), unique=True)
+    update_interval = Field(Integer, default=3600)
 
-            self.c.execute('''select count(*) as read_items from items where feed_id = ? and read = 0''', (feed_id,))
-            (new_items,) = self.c.fetchone()
+    created_at = Field(DateTime, default=datetime.datetime.now)
+    updated_at = Field(DateTime, default=datetime.datetime.now)
 
-            self.c.execute('''select count(*) as read_items from items where feed_id = ? and read = 1''', (feed_id,))
-            (read_items,) = self.c.fetchone()
+    def __init__(self, url):
+        """
+        Given a url add this feed to the database.
+        """
 
-            yield {
-                'feed_id': feed_id,
-                'title': title.encode('ascii','ignore'),
-                'url': url,
-                'new': new_items,
-                'read': read_items,
-                'updated_at': updated_at,
-                'interval': interval
-                }
+        rss = feedparser.parse(url)
 
-    def update_feeds(self):
-        items = []
+        self.title = rss.feed.title
+        self.url = url
 
-        for item in self.get_feeds(limit=(0, -1)):
-            # Yuck. Must be a better way to do this...
-            #if (int(time.strftime('%s', time.gmtime())) - int(item['updated_at'])) > int(item['interval']):
-            #    break
+        session.commit()
 
-            url_feed = feedparser.parse(item['url'])
+    def refresh(self):
+        rss = feedparser.parse(self.url)
 
-            for entry in url_feed.entries:
-                print entry.title
-                print entry.link
-                published_at = None
-                if entry.has_key('updated'):
-                    published_at = entry.updated_parsed
-                elif entry.has_key('published'):
-                    published_at = entry.published_parsed
-                elif entry.has_key('created'):
-                    published_at = entry.created_parsed
+        for item in rss.entries:
+            feed_item = FeedItem(self, item)
+            session.commit()
 
-                published_at = calendar.timegm(published_at)
+    def unread(self):
+        return len([1 for item in self.items if item.is_read == False])
 
-                self.c.execute('''insert or ignore into items (feed_id, url, title, description, published_at) values (?, ?, ?, ?, ?)''', (item['feed_id'], entry.link, entry.title, '', published_at,))
+class FeedItem(Entity):
+    id = Field(Integer, primary_key=True)
+    feed = ManyToOne('Feed')
 
-            self.conn.commit()
+    title = Field(String(255))
+    url = Field(String(255), unique=True)
 
-    def get_items(self, feed_id, limit):
-        self.c.execute('''select id, title, url, read, datetime(published_at, 'unixepoch'), updated_at from items where feed_id = ? order by published_at desc limit ?, ?''', (feed_id, limit[0], limit[1],))
-        rows = self.c.fetchall()
+    description = Field(Text)
 
-        for row in rows:
-            (item_id, title, url, read, published_at, updated_at) = row
+    is_read = Field(Boolean, default=False)
+    like_this = Field(Boolean, default=False)
 
-            yield {
-                'item_id': item_id,
-                'title': title.encode('ascii','ignore'),
-                'url': url,
-                'read': (read == 1),
-                'published': published_at,
-                }
+    published_at = Field(DateTime, default=datetime.datetime.now)
 
-    def get_item(self, item_id):
-        self.c.execute('''select id, title, url, published_at from items where id = ?''', (item_id,))
-        (item_id, title, url, published) = self.c.fetchone()
+    created_at = Field(DateTime, default=datetime.datetime.now)
+    updated_at = Field(DateTime, default=datetime.datetime.now)
 
-        return {
-            'item_id': item_id,
-            'title': title,
-            'url': url,
-            'published': published,
-            }
+    def __init__(self, feed, item):
+        self.feed = feed
 
-    def mark_item_as_read(self, item_id):
-        self.c.execute('''update items set read = 1, updated_at = datetime('now') where id = ?''', (item_id,))
-        self.conn.commit()
+        self.title = item.title
+        self.url = item.link
+
+        if item.has_key('published'):
+            self.published_at = datetime.datetime(*item.published_parsed[:6])
+        elif item.has_key('updated'):
+            self.published_at = datetime.datetime(*item.updated_parsed[:6])
+        elif item.has_key('created'):
+            self.published_at = datetime.datetime(*item.published_parsed[:6])
+
+
 
 class Screen(object):
     def __init__(self, stdscr):
@@ -147,7 +91,7 @@ class Screen(object):
 
     def display_menu(self):
         self.stdscr.clear()
-        self.stdscr.addstr(0, 0, " rutt n:Next Page p:Prev Page a:Add feed R:Refresh q:Quit\n", curses.A_REVERSE)
+        self.stdscr.addstr(0, 0, " rutt %s\n" % self.menu, curses.A_REVERSE)
 
     def move_pointer(self, pos):
         self.stdscr.addstr(self.cur_y, 0, " ")
@@ -159,30 +103,35 @@ class Screen(object):
 class FeedScreen(Screen):
     def __init__(self, stdscr):
         self.feeds = {}
+        self.menu = "n:Next Page p:Prev Page a:Add feed R:Refresh q:Quit"
         super(FeedScreen, self).__init__(stdscr)
 
     def display_feeds(self):
-        global config
-
         self.cur_y = self.min_y
 
-        for item in config.get_feeds(limit=self.limit):
-            self.stdscr.addstr(self.cur_y, 0, "  %d/%d\t\t%s\n" % (item['new'],
-                                                                   item['new'] + item['read'],
-                                                                   item['title'],))
-            self.feeds[self.cur_y] = item['feed_id']
+        for feed in Feed.query.limit(10):
+            self.stdscr.addstr(self.cur_y, 0, "  %d/%d\t\t%s\n" % (feed.unread(),
+                                                                   len(feed.items),
+                                                                   feed.title,))
+            self.feeds[self.cur_y] = feed.id
 
             self.cur_y += 1
 
         self.cur_y = self.min_y
         self.stdscr.refresh()
 
+    def window(self, start_limit=None, end_limit=None):
+        self.stdscr.clear()
 
-    def loop(self):
-        self.limit = (0, curses.LINES - 2)
+        if start_limit or end_limit:
+            self.limit = (start_limit, end_limit)
+
         self.display_menu()
         self.display_feeds()
         self.move_pointer(0)
+
+    def loop(self):
+        self.window(0, curses.LINES - 2)
 
         while True:
             c = self.stdscr.getch()
@@ -194,26 +143,14 @@ class FeedScreen(Screen):
                 elif chr(c) in 'Rr':
                     pass
                 elif chr(c) in 'Pp':
-                    self.limit = (self.limit[0] - curses.LINES - 2, self.limit[0])
-                    self.stdscr.clear()
-                    self.display_menu()
-                    self.display_feeds()
-                    self.move_pointer(0)
+                    self.window(self.limit[0] - curses.LINES - 2, self.limit[0])
                 elif chr(c) in 'Nn':
-                    self.limit = (self.limit[1], self.limit[1] + curses.LINES - 2)
-                    self.stdscr.clear()
-                    self.display_menu()
-                    self.display_feeds()
-                    self.move_pointer(0)
+                    self.window(self.limit[1], self.limit[1] + curses.LINES - 2)
                 elif chr(c) == ' ':
                     item_screen = ItemScreen(self.stdscr, self.feeds[self.cur_y])
                     item_screen.loop()
 
-                    self.stdscr.clear()
-
-                    self.display_menu()
-                    self.display_feeds()
-                    self.move_pointer(self.min_y)
+                    self.window()
             else:
                 if c == curses.KEY_UP:
                     self.move_pointer(-1)
@@ -228,11 +165,9 @@ class ItemScreen(Screen):
         super(ItemScreen, self).__init__(stdscr)
 
     def display_items(self):
-        global config
-
         self.cur_y = self.min_y
 
-        for item in config.get_items(self.feed_id, limit=self.limit):
+        for item in []:
             self.stdscr.addstr(self.cur_y, 0, "  %s\t%s\t%s\n" % ('N' if not item['read'] else ' ', item['published'], item['title']))
 
             self.items[self.cur_y] = item['item_id']
@@ -287,8 +222,6 @@ class ContentScreen(Screen):
         super(ContentScreen, self).__init__(stdscr)
 
     def get_content(self):
-        global config
-
         self.item = config.get_item(self.item_id)
         config.mark_item_as_read(self.item_id)
 
@@ -340,8 +273,6 @@ class ContentScreen(Screen):
                     self.display_menu()
                     self.move_pointer(1)
 
-config = None
-
 def start_screen():
     stdscr = curses.initscr()
 
@@ -369,21 +300,36 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="rutt - Mutt like RSS/Atom reader")
     parser.add_argument('-a', '--add', nargs='+', help="Add a new feed.", metavar="url")
     parser.add_argument('-r', '--reload', action='store_true', help="Update feeds.")
+    parser.add_argument('-l', '--list-feeds', action='store_true', help="List the feeds")
     args = parser.parse_args()
 
-    config = Database()
+    metadata.bind = "sqlite:///rutt.db"
+    metadata.bind.echo = False
+
+    # Create the models.
+    setup_all()
+    create_all()
 
     if args.add is not None:
         for url in args.add:
             try:
-                config.add_feed(url)
+                feed = Feed(url)
             except:
                 print "Failed to add %s" % url
 
         sys.exit()
 
+    if args.list_feeds is True:
+        for feed in Feed.query.all():
+            print feed.url
+
+            for item in feed.items:
+                print "|-> %s" % item.url
+        sys.exit()
+
     if args.reload is True:
-        config.update_feeds()
+        for feed in Feed.query.all():
+            feed.refresh()
         sys.exit()
 
     start_screen()

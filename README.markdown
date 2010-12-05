@@ -14,6 +14,7 @@ stable.
 
  * Python 2.6
  * [feedparser](http://feedparser.org/)
+ * Elixir
 
 ### Download & Repository
 
