@@ -158,29 +158,37 @@ class FeedScreen(Screen):
                     self.move_pointer(1)
 
 class ItemScreen(Screen):
-    def __init__(self, stdscr, feed_id):
-        self.feed_id = feed_id
+    def __init__(self, stdscr, feed):
+        self.feed = feed
         self.items = {}
+        self.menu = ""
 
         super(ItemScreen, self).__init__(stdscr)
 
     def display_items(self):
         self.cur_y = self.min_y
 
-        for item in []:
-            self.stdscr.addstr(self.cur_y, 0, "  %s\t%s\t%s\n" % ('N' if not item['read'] else ' ', item['published'], item['title']))
+        for item in FeedItem.query.all():
+            self.stdscr.addstr(self.cur_y, 0, "  %s\t%s\t%s\n" % ('N' if not item.is_read else ' ', item.published_at, item.title))
 
-            self.items[self.cur_y] = item['item_id']
+            self.items[self.cur_y] = item
             self.cur_y += 1
 
         self.cur_y = self.min_y
         self.stdscr.refresh()
 
-    def loop(self):
-        self.limit = (0, curses.LINES - 2)
+    def window(self, start_limit=None, end_limit=None):
+        self.stdscr.clear()
+
+        if start_limit or end_limit:
+            self.limit = (start_limit, end_limit)
+
         self.display_menu()
         self.display_items()
         self.move_pointer(0)
+
+    def loop(self):
+        self.window()
 
         while True:
             c = self.stdscr.getch()
@@ -188,26 +196,15 @@ class ItemScreen(Screen):
                 if chr(c) in 'Ii':
                     break
                 elif chr(c) in 'Pp':
-                    self.limit = (self.limit[0] - curses.LINES - 2, self.limit[0])
-                    self.stdscr.clear()
-                    self.display_menu()
-                    self.display_items()
-                    self.move_pointer(0)
+                    self.window(self.limit[0] - curses.LINES - 2, self.limit[0])
+
                 elif chr(c) in 'Nn':
-                    self.limit = (self.limit[1], self.limit[1] + curses.LINES - 2)
-                    self.stdscr.clear()
-                    self.display_menu()
-                    self.display_items()
-                    self.move_pointer(0)
+                    self.window(self.limit[1], self.limit[1] + curses.LINES - 2)
                 elif chr(c) == ' ':
                     content_screen = ContentScreen(self.stdscr, self.items[self.cur_y])
                     content_screen.loop()
 
-                    self.stdscr.clear()
-
-                    self.display_menu()
-                    self.display_items()
-                    self.move_pointer(0)
+                    self.window()
             else:
                 if c == curses.KEY_UP:
                     self.move_pointer(-1)
