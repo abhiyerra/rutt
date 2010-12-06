@@ -96,6 +96,12 @@ class FeedItem(Entity):
         self.is_read = True
         session.commit()
 
+    def mark_as_unread(self):
+        """
+        Mark the current item as unread.
+        """
+        self.is_read = False
+        session.commit()
 
 
 class Screen(object):
@@ -112,10 +118,14 @@ class Screen(object):
         self.stdscr.clear()
         self.stdscr.addstr(0, 0, " rutt %s\n" % self.menu, curses.A_REVERSE)
 
-    def move_pointer(self, pos):
+    def move_pointer(self, pos, move_to=False):
         self.stdscr.addstr(self.cur_y, 0, " ")
 
-        self.cur_y += pos
+        if move_to is True:
+            self.cur_y = pos
+        else:
+            self.cur_y += pos
+
         self.stdscr.addstr(self.cur_y, 0, ">", curses.A_REVERSE)
 
 
@@ -180,7 +190,7 @@ class ItemScreen(Screen):
     def __init__(self, stdscr, feed):
         self.feed = feed
         self.items = {}
-        self.menu = " i:Back"
+        self.menu = " i:quit m:mark as read u:mark as unread"
 
         super(ItemScreen, self).__init__(stdscr)
 
@@ -219,9 +229,15 @@ class ItemScreen(Screen):
                 elif chr(c) in 'Nn':
                     self.window(self.limit[1], self.limit[1] + curses.LINES - 2)
                 elif chr(c) in 'Mm':
-                    pass # TODO Mark as read
+                    cur_y = self.cur_y
+                    self.items[cur_y].mark_as_read()
+                    self.window()
+                    self.move_pointer(cur_y, move_to=True)
                 elif chr(c) in 'Uu':
-                    pass # TODO Mark as unread
+                    cur_y = self.cur_y
+                    self.items[cur_y].mark_as_unread()
+                    self.window()
+                    self.move_pointer(cur_y, move_to=True)
                 elif chr(c) == ' ':
                     content_screen = ContentScreen(self.stdscr, self.items[self.cur_y])
                     content_screen.loop()
