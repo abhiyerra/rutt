@@ -1,0 +1,6 @@
+2010-12-05  Abhi Yerra  <abhi@berkeley.edu>
+
+        * The basic features: downloading feeds, viewing items, marking feeds are done.
+        * Still have problems crashing when going off the page.
+
+
