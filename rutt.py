@@ -33,6 +33,7 @@ class Feed(Entity):
     created_at = Field(DateTime, default=datetime.datetime.now)
     updated_at = Field(DateTime, default=datetime.datetime.now)
 
+
     def __init__(self, url):
         """
         Given a url add this feed to the database.
@@ -81,6 +82,8 @@ class FeedItem(Entity):
 
     created_at = Field(DateTime, default=datetime.datetime.now)
     updated_at = Field(DateTime, default=datetime.datetime.now)
+
+    using_options(order_by='-published_at')
 
     def __init__(self, feed, item):
         """
