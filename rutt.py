@@ -17,8 +17,10 @@ import webbrowser
 from elixir import *
 
 def printable(input):
+    """
+    Removes unicode characters so they can be displayed on Terminal.
+    """
     return ''.join([x for x in input if x in string.printable])
-
 
 class Feed(Entity):
     id = Field(Integer, primary_key=True)
@@ -119,14 +121,16 @@ class Screen(object):
 
 class FeedScreen(Screen):
     def __init__(self, stdscr):
+        self._feeds = Feed.query.all()
         self.feeds = {}
-        self.menu = "n:Next Page p:Prev Page a:Add feed R:Refresh q:Quit"
+        self.menu = "q:Quit"
+
         super(FeedScreen, self).__init__(stdscr)
 
     def display_feeds(self):
         self.cur_y = self.min_y
 
-        for feed in Feed.query.limit(10):
+        for feed in self._feeds[self.limit[0]:self.limit[1]]:
             self.stdscr.addstr(self.cur_y, 0, "  %d/%d\t\t%s\n" % (feed.unread(), len(feed.items), printable(feed.title),))
             self.feeds[self.cur_y] = feed
 
@@ -176,14 +180,14 @@ class ItemScreen(Screen):
     def __init__(self, stdscr, feed):
         self.feed = feed
         self.items = {}
-        self.menu = ""
+        self.menu = " i:Back"
 
         super(ItemScreen, self).__init__(stdscr)
 
     def display_items(self):
         self.cur_y = self.min_y
 
-        for item in self.feed.items:
+        for item in self.feed.items[self.limit[0]:self.limit[1]]:
             self.stdscr.addstr(self.cur_y, 0, "  %s\t%s\t%s\n" % ('N' if not item.is_read else ' ', item.published_at, printable(item.title),))
 
             self.items[self.cur_y] = item
@@ -203,7 +207,7 @@ class ItemScreen(Screen):
         self.move_pointer(0)
 
     def loop(self):
-        self.window()
+        self.window(0, curses.LINES - 2)
 
         while True:
             c = self.stdscr.getch()
@@ -212,9 +216,12 @@ class ItemScreen(Screen):
                     break
                 elif chr(c) in 'Pp':
                     self.window(self.limit[0] - curses.LINES - 2, self.limit[0])
-
                 elif chr(c) in 'Nn':
                     self.window(self.limit[1], self.limit[1] + curses.LINES - 2)
+                elif chr(c) in 'Mm':
+                    pass # TODO Mark as read
+                elif chr(c) in 'Uu':
+                    pass # TODO Mark as unread
                 elif chr(c) == ' ':
                     content_screen = ContentScreen(self.stdscr, self.items[self.cur_y])
                     content_screen.loop()
@@ -231,13 +238,11 @@ class ItemScreen(Screen):
 class ContentScreen(Screen):
     def __init__(self, stdscr, item):
         self.item = item
-        self.menu = ""
+        self.menu = "i:back b:open in browser"
 
         super(ContentScreen, self).__init__(stdscr)
 
     def get_content(self):
-
-
         render_cmd = "elinks -dump -force-html %s" % self.item.url
         self.content = os.popen(render_cmd).read().split("\n")
 
@@ -274,7 +279,7 @@ class ContentScreen(Screen):
                     self.item.mark_as_read()
                     break
                 elif chr(c) in 'Bb':
-                    webbrowser.open_new_tab(self.item['url'])
+                    webbrowser.open_new_tab(self.item.url)
                 elif chr(c) in ' ':
                     self.window(10)
             else:
