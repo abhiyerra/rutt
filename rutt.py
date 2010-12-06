@@ -17,7 +17,8 @@ import webbrowser
 from elixir import *
 
 def printable(input):
-    return filter(lambda x: x in string.printable, input)
+    return ''.join([x for x in input if x in string.printable])
+
 
 class Feed(Entity):
     id = Field(Integer, primary_key=True)
