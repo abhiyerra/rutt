@@ -113,7 +113,7 @@ class FeedScreen(Screen):
             self.stdscr.addstr(self.cur_y, 0, "  %d/%d\t\t%s\n" % (feed.unread(),
                                                                    len(feed.items),
                                                                    feed.title,))
-            self.feeds[self.cur_y] = feed.id
+            self.feeds[self.cur_y] = feed
 
             self.cur_y += 1
 
@@ -168,7 +168,7 @@ class ItemScreen(Screen):
     def display_items(self):
         self.cur_y = self.min_y
 
-        for item in FeedItem.query.all():
+        for item in self.feed.items:
             self.stdscr.addstr(self.cur_y, 0, "  %s\t%s\t%s\n" % ('N' if not item.is_read else ' ', item.published_at, item.title))
 
             self.items[self.cur_y] = item
@@ -214,22 +214,23 @@ class ItemScreen(Screen):
 
 
 class ContentScreen(Screen):
-    def __init__(self, stdscr, item_id):
-        self.item_id = item_id
+    def __init__(self, stdscr, item):
+        self.item = item
+        self.menu = ""
+
         super(ContentScreen, self).__init__(stdscr)
 
     def get_content(self):
-        self.item = config.get_item(self.item_id)
-        config.mark_item_as_read(self.item_id)
 
-        render_cmd = "elinks -dump -force-html %s" % self.item['url']
+
+        render_cmd = "elinks -dump -force-html %s" % self.item.url
         self.content = os.popen(render_cmd).read().split("\n")
 
     def move_pointer(self, pos):
         if self.cur_line + pos < 0:
             return
 
-        self.stdscr.addstr(1, 2, "%s (%s)\n" % (self.item['title'], self.item['url']), curses.A_BOLD)
+        self.stdscr.addstr(1, 2, "%s (%s)\n" % (self.item.title, self.item.url), curses.A_BOLD)
 
         self.cur_line = self.cur_line + pos
 
@@ -241,34 +242,31 @@ class ContentScreen(Screen):
 
         self.stdscr.refresh()
 
+    def window(self, pointer_pos):
+        self.stdscr.clear()
+        self.display_menu()
+        self.move_pointer(pointer_pos)
+
     def loop(self):
         self.cur_line = 0
         self.get_content()
-
-        self.stdscr.clear()
-        self.display_menu()
-        self.move_pointer(0)
+        self.window(0)
 
         while True:
             c = self.stdscr.getch()
             if 0 < c < 256:
                 if chr(c) in 'Ii':
+                    #      config.mark_item_as_read(self.item_id) TODO
                     break
                 elif chr(c) in 'Bb':
                     webbrowser.open_new_tab(self.item['url'])
                 elif chr(c) in ' ':
-                    self.stdscr.clear()
-                    self.display_menu()
-                    self.move_pointer(10)
+                    self.window(10)
             else:
                 if c == curses.KEY_UP:
-                    self.stdscr.clear()
-                    self.display_menu()
-                    self.move_pointer(-1)
+                    self.window(-1)
                 elif c == curses.KEY_DOWN:
-                    self.stdscr.clear()
-                    self.display_menu()
-                    self.move_pointer(1)
+                    self.window(1)
 
 def start_screen():
     stdscr = curses.initscr()
