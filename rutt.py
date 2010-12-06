@@ -4,15 +4,20 @@ import argparse
 import calendar
 import curses
 import curses.wrapper
+import datetime
 import feedparser
 import os
+import sqlalchemy
 import sqlite3
+import string
 import sys
 import time
 import webbrowser
-import datetime
+
 from elixir import *
 
+def printable(input):
+    return filter(lambda x: x in string.printable, input)
 
 class Feed(Entity):
     id = Field(Integer, primary_key=True)
@@ -35,14 +40,15 @@ class Feed(Entity):
         self.title = rss.feed.title
         self.url = url
 
-        session.commit()
-
     def refresh(self):
         rss = feedparser.parse(self.url)
 
         for item in rss.entries:
-            feed_item = FeedItem(self, item)
-            session.commit()
+            try:
+                feed_item = FeedItem(self, item)
+                session.commit()
+            except:
+                session.rollback()
 
     def unread(self):
         return len([1 for item in self.items if item.is_read == False])
@@ -120,9 +126,7 @@ class FeedScreen(Screen):
         self.cur_y = self.min_y
 
         for feed in Feed.query.limit(10):
-            self.stdscr.addstr(self.cur_y, 0, "  %d/%d\t\t%s\n" % (feed.unread(),
-                                                                   len(feed.items),
-                                                                   feed.title,))
+            self.stdscr.addstr(self.cur_y, 0, "  %d/%d\t\t%s\n" % (feed.unread(), len(feed.items), printable(feed.title),))
             self.feeds[self.cur_y] = feed
 
             self.cur_y += 1
@@ -179,7 +183,7 @@ class ItemScreen(Screen):
         self.cur_y = self.min_y
 
         for item in self.feed.items:
-            self.stdscr.addstr(self.cur_y, 0, "  %s\t%s\t%s\n" % ('N' if not item.is_read else ' ', item.published_at, item.title))
+            self.stdscr.addstr(self.cur_y, 0, "  %s\t%s\t%s\n" % ('N' if not item.is_read else ' ', item.published_at, printable(item.title),))
 
             self.items[self.cur_y] = item
             self.cur_y += 1
@@ -319,6 +323,9 @@ if __name__ == '__main__':
         for url in args.add:
             try:
                 feed = Feed(url)
+                session.commit()
+            except sqlalchemy.exc.IntegrityError:
+                session.rollback()
             except:
                 print "Failed to add %s" % url
 
@@ -335,6 +342,7 @@ if __name__ == '__main__':
     if args.reload is True:
         for feed in Feed.query.all():
             feed.refresh()
+
         sys.exit()
 
     start_screen()
