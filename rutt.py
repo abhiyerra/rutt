@@ -56,6 +56,15 @@ class Feed(Entity):
     def unread(self):
         return len([1 for item in self.items if item.is_read == False])
 
+    def remove(self):
+        try:
+            for item in self.items:
+                item.delete()
+            self.delete()
+            session.commit()
+        except:
+            session.rollback()
+
 class FeedItem(Entity):
     id = Field(Integer, primary_key=True)
     feed = ManyToOne('Feed')
@@ -131,11 +140,15 @@ class Screen(object):
 
 class FeedScreen(Screen):
     def __init__(self, stdscr):
-        self._feeds = Feed.query.all()
         self.feeds = {}
-        self.menu = "q:Quit"
+        self.menu = "q:Quit d:delete"
+
+        self.reload_feeds()
 
         super(FeedScreen, self).__init__(stdscr)
+
+    def reload_feeds(self):
+        self._feeds = Feed.query.all()
 
     def display_feeds(self):
         self.cur_y = self.min_y
@@ -169,17 +182,29 @@ class FeedScreen(Screen):
                     break
                 elif chr(c) in 'Aa':
                     pass
-                elif chr(c) in 'Rr':
-                    pass
+                elif chr(c) in 'Dd':
+                    cur_y = self.cur_y
+                    self.stdscr.clear()
+                    self.display_menu()
+                    feed = self.feeds[cur_y]
+                    self.stdscr.addstr(2, 0, "Are you sure you want to delete %s? " % printable(feed.title))
+                    d = self.stdscr.getch()
+                    if chr(d) in 'Yy':
+                        feed.remove()
+                        self.reload_feeds()
+                    self.window()
+                    self.move_pointer(cur_y, move_to=True)
                 elif chr(c) in 'Pp':
                     self.window(self.limit[0] - curses.LINES - 2, self.limit[0])
                 elif chr(c) in 'Nn':
                     self.window(self.limit[1], self.limit[1] + curses.LINES - 2)
                 elif chr(c) == ' ':
-                    item_screen = ItemScreen(self.stdscr, self.feeds[self.cur_y])
+                    cur_y = self.cur_y
+                    item_screen = ItemScreen(self.stdscr, self.feeds[cur_y])
                     item_screen.loop()
 
                     self.window()
+                    self.move_pointer(cur_y, move_to=True)
             else:
                 if c == curses.KEY_UP:
                     self.move_pointer(-1)
@@ -190,7 +215,7 @@ class ItemScreen(Screen):
     def __init__(self, stdscr, feed):
         self.feed = feed
         self.items = {}
-        self.menu = " i:quit m:mark as read u:mark as unread"
+        self.menu = " i:quit r:refresh m:mark as read u:mark as unread"
 
         super(ItemScreen, self).__init__(stdscr)
 
@@ -238,6 +263,9 @@ class ItemScreen(Screen):
                     self.items[cur_y].mark_as_unread()
                     self.window()
                     self.move_pointer(cur_y, move_to=True)
+                elif chr(c) in 'Rr':
+                    self.feed.refresh()
+                    self.window()
                 elif chr(c) == ' ':
                     content_screen = ContentScreen(self.stdscr, self.items[self.cur_y])
                     content_screen.loop()
@@ -356,9 +384,6 @@ if __name__ == '__main__':
     if args.list_feeds is True:
         for feed in Feed.query.all():
             print feed.url
-
-            for item in feed.items:
-                print "|-> %s" % item.url
         sys.exit()
 
     if args.reload is True:
