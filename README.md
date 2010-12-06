@@ -12,7 +12,7 @@ stable.
 
 ### Dependencies
 
- * Python 2.6
+ * Python 2.7
  * [feedparser](http://feedparser.org/)
  * Elixir
 
@@ -23,3 +23,6 @@ check out the [repository](https://github.com/abhiyerra/rutt)
 to use it.
 
     https://github.com/abhiyerra/rutt
+
+Downloads are located here:
+    https://github.com/abhiyerra/rutt/downloads
