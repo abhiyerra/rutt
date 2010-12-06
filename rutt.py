@@ -154,6 +154,9 @@ class FeedScreen(Screen):
         self.cur_y = self.min_y
 
         for feed in self._feeds[self.limit[0]:self.limit[1]]:
+            if feed.unread() == 0:
+                continue
+
             self.stdscr.addstr(self.cur_y, 0, "  %d/%d\t\t%s\n" % (feed.unread(), len(feed.items), printable(feed.title),))
             self.feeds[self.cur_y] = feed
 
@@ -288,7 +291,7 @@ class ContentScreen(Screen):
 
     def get_content(self):
         render_cmd = "elinks -dump -force-html %s" % self.item.url
-        self.content = os.popen(render_cmd).read().split("\n")
+        self.content = printable(os.popen(render_cmd).read()).split("\n")
 
     def move_pointer(self, pos):
         if self.cur_line + pos < 0:
