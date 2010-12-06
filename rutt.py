@@ -65,6 +65,9 @@ class FeedItem(Entity):
     updated_at = Field(DateTime, default=datetime.datetime.now)
 
     def __init__(self, feed, item):
+        """
+        Create a new item for a feed.
+        """
         self.feed = feed
 
         self.title = item.title
@@ -76,6 +79,13 @@ class FeedItem(Entity):
             self.published_at = datetime.datetime(*item.updated_parsed[:6])
         elif item.has_key('created'):
             self.published_at = datetime.datetime(*item.published_parsed[:6])
+
+    def mark_as_read(self):
+        """
+        Mark the current item as read.
+        """
+        self.is_read = True
+        session.commit()
 
 
 
@@ -193,7 +203,7 @@ class ItemScreen(Screen):
         while True:
             c = self.stdscr.getch()
             if 0 < c < 256:
-                if chr(c) in 'Ii':
+                if chr(c) in 'IiQq':
                     break
                 elif chr(c) in 'Pp':
                     self.window(self.limit[0] - curses.LINES - 2, self.limit[0])
@@ -255,8 +265,8 @@ class ContentScreen(Screen):
         while True:
             c = self.stdscr.getch()
             if 0 < c < 256:
-                if chr(c) in 'Ii':
-                    #      config.mark_item_as_read(self.item_id) TODO
+                if chr(c) in 'IiQq':
+                    self.item.mark_as_read()
                     break
                 elif chr(c) in 'Bb':
                     webbrowser.open_new_tab(self.item['url'])
