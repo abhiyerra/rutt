@@ -293,7 +293,7 @@ class ContentScreen(Screen):
         super(ContentScreen, self).__init__(stdscr)
 
     def get_content(self):
-        render_cmd = "elinks -dump -force-html %s" % self.item.url
+        render_cmd = "elinks -dump -dump-charset ascii -force-html %s" % self.item.url
         self.content = printable(os.popen(render_cmd).read()).split("\n")
 
     def move_pointer(self, pos):

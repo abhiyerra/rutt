@@ -15,6 +15,7 @@ stable.
  * Python 2.7
  * [feedparser](http://feedparser.org/)
  * Elixir
+ * elinks (For now.)
 
 ### Download & Repository
 
