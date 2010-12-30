@@ -278,10 +278,13 @@ class ItemScreen(Screen):
                     self.feed.refresh()
                     self.window()
                 elif chr(c) == ' ':
+                    cur_y = self.cur_y
+
                     content_screen = ContentScreen(self.stdscr, self.items[self.cur_y])
                     content_screen.loop()
 
                     self.window()
+                    self.move_pointer(cur_y, move_to=True)
             else:
                 if c == curses.KEY_UP:
                     self.move_pointer(-1)
