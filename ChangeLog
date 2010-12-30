@@ -1,3 +1,12 @@
+2010-12-29  Abhi Yerra  <abhi@berkeley.edu>
+
+	* I was getting an error opening pages that had unicode in them. I added the locale
+	  module to fix that.
+	* You can now open a page on the feed item window
+	* Can refresh all the feeds from within the window. There still needs to be a feedback
+	  instead of freezing the frame.
+	* The correct item is picked when you go to the prior page.
+
 2010-12-05  Abhi Yerra  <abhi@berkeley.edu>
 
         * The basic features: downloading feeds, viewing items, marking feeds are done.
