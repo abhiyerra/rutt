@@ -144,7 +144,7 @@ class Screen(object):
 class FeedScreen(Screen):
     def __init__(self, stdscr):
         self.feeds = {}
-        self.menu = "q:Quit d:delete"
+        self.menu = "q:Quit d:delete r:refresh all"
 
         self.reload_feeds()
 
@@ -188,6 +188,13 @@ class FeedScreen(Screen):
                     break
                 elif chr(c) in 'Aa':
                     pass
+                elif chr(c) in 'Rr':
+                    cur_y = self.cur_y
+                    for feed in Feed.query.all():
+                        feed.refresh()
+                    self.reload_feeds()
+                    self.window()
+                    self.move_pointer(cur_y, move_to=True)
                 elif chr(c) in 'Dd':
                     cur_y = self.cur_y
                     self.stdscr.clear()
