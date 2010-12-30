@@ -16,11 +16,9 @@ import webbrowser
 
 from elixir import *
 
-def printable(input):
-    """
-    Removes unicode characters so they can be displayed on Terminal.
-    """
-    return ''.join([x for x in input if x in string.printable])
+import locale
+locale.setlocale(locale.LC_ALL,"")
+
 
 class Feed(Entity):
     id = Field(Integer, primary_key=True)
@@ -32,7 +30,6 @@ class Feed(Entity):
 
     created_at = Field(DateTime, default=datetime.datetime.now)
     updated_at = Field(DateTime, default=datetime.datetime.now)
-
 
     def __init__(self, url):
         """
@@ -160,7 +157,7 @@ class FeedScreen(Screen):
             if feed.unread() == 0:
                 continue
 
-            self.stdscr.addstr(self.cur_y, 0, "  %d/%d\t\t%s\n" % (feed.unread(), len(feed.items), printable(feed.title),))
+            self.stdscr.addstr(self.cur_y, 0, "  %d/%d\t\t%s\n" % (feed.unread(), len(feed.items), feed.title.encode("utf-8"),))
             self.feeds[self.cur_y] = feed
 
             self.cur_y += 1
@@ -200,7 +197,7 @@ class FeedScreen(Screen):
                     self.stdscr.clear()
                     self.display_menu()
                     feed = self.feeds[cur_y]
-                    self.stdscr.addstr(2, 0, "Are you sure you want to delete %s? " % printable(feed.title))
+                    self.stdscr.addstr(2, 0, "Are you sure you want to delete %s? " % feed.title.encode("utf-8"))
                     d = self.stdscr.getch()
                     if chr(d) in 'Yy':
                         feed.remove()
@@ -208,7 +205,7 @@ class FeedScreen(Screen):
                     self.window()
                     self.move_pointer(cur_y, move_to=True)
                 elif chr(c) in 'Pp':
-                    self.window(self.limit[0] - curses.LINES - 2, self.limit[0])
+                    self.window(self.limit[1] - curses.LINES, self.limit[1] - 2)
                 elif chr(c) in 'Nn':
                     self.window(self.limit[1], self.limit[1] + curses.LINES - 2)
                 elif chr(c) == ' ':
@@ -236,7 +233,7 @@ class ItemScreen(Screen):
         self.cur_y = self.min_y
 
         for item in self.feed.items[self.limit[0]:self.limit[1]]:
-            self.stdscr.addstr(self.cur_y, 0, "  %s\t%s\t%s\n" % ('N' if not item.is_read else ' ', item.published_at, printable(item.title),))
+            self.stdscr.addstr(self.cur_y, 0, "  %s\t%s\t%s\n" % ('N' if not item.is_read else ' ', item.published_at, item.title.encode("utf-8"),))
 
             self.items[self.cur_y] = item
             self.cur_y += 1
@@ -263,7 +260,7 @@ class ItemScreen(Screen):
                 if chr(c) in 'IiQq':
                     break
                 elif chr(c) in 'Pp':
-                    self.window(self.limit[0] - curses.LINES - 2, self.limit[0])
+                    self.window(self.limit[1] - curses.LINES - 2, self.limit[1])
                 elif chr(c) in 'Nn':
                     self.window(self.limit[1], self.limit[1] + curses.LINES - 2)
                 elif chr(c) in 'Bb':
@@ -309,7 +306,7 @@ class ContentScreen(Screen):
 
     def get_content(self):
         render_cmd = "elinks -dump -dump-charset ascii -force-html %s" % self.item.url
-        self.content = printable(os.popen(render_cmd).read()).split("\n")
+        self.content = os.popen(render_cmd).read().encode("utf-8").split("\n")
 
     def move_pointer(self, pos):
         if self.cur_line + pos < 0:
