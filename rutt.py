@@ -221,7 +221,7 @@ class ItemScreen(Screen):
     def __init__(self, stdscr, feed):
         self.feed = feed
         self.items = {}
-        self.menu = " i:quit r:refresh m:mark as read u:mark as unread"
+        self.menu = " i:quit r:refresh m:mark as read u:mark as unread b:open in browser"
 
         super(ItemScreen, self).__init__(stdscr)
 
@@ -259,6 +259,11 @@ class ItemScreen(Screen):
                     self.window(self.limit[0] - curses.LINES - 2, self.limit[0])
                 elif chr(c) in 'Nn':
                     self.window(self.limit[1], self.limit[1] + curses.LINES - 2)
+                elif chr(c) in 'Bb':
+                    cur_y = self.cur_y
+                    self.items[cur_y].mark_as_read()
+                    webbrowser.open_new_tab(self.items[cur_y].url)
+                    self.window()
                 elif chr(c) in 'Mm':
                     cur_y = self.cur_y
                     self.items[cur_y].mark_as_read()
