@@ -19,7 +19,6 @@ from elixir import *
 import locale
 locale.setlocale(locale.LC_ALL,"")
 
-
 class Feed(Entity):
     id = Field(Integer, primary_key=True)
     items = OneToMany('FeedItem')
@@ -205,7 +204,7 @@ class FeedScreen(Screen):
                     self.window()
                     self.move_pointer(cur_y, move_to=True)
                 elif chr(c) in 'Pp':
-                    self.window(self.limit[1] - curses.LINES, self.limit[1] - 2)
+                    self.window(self.limit[0] - curses.LINES - 2, self.limit[0])
                 elif chr(c) in 'Nn':
                     self.window(self.limit[1], self.limit[1] + curses.LINES - 2)
                 elif chr(c) == ' ':
@@ -225,7 +224,7 @@ class ItemScreen(Screen):
     def __init__(self, stdscr, feed):
         self.feed = feed
         self.items = {}
-        self.menu = " i:quit r:refresh m:mark as read u:mark as unread b:open in browser"
+        self.menu = " i:quit r:refresh m:mark as read u:mark as unread a:mark all as read b:open in browser"
 
         super(ItemScreen, self).__init__(stdscr)
 
@@ -259,6 +258,11 @@ class ItemScreen(Screen):
             if 0 < c < 256:
                 if chr(c) in 'IiQq':
                     break
+                elif chr(c) in 'Aa':
+                    for item in self.feed.items:
+                        item.mark_as_read()
+                    self.window()
+                    self.move_pointer(self.cur_y, move_to=True)
                 elif chr(c) in 'Pp':
                     self.window(self.limit[1] - curses.LINES - 2, self.limit[1])
                 elif chr(c) in 'Nn':
@@ -267,12 +271,11 @@ class ItemScreen(Screen):
                     cur_y = self.cur_y
                     self.items[cur_y].mark_as_read()
                     webbrowser.open_new_tab(self.items[cur_y].url)
-                    self.window()
                 elif chr(c) in 'Mm':
                     cur_y = self.cur_y
                     self.items[cur_y].mark_as_read()
                     self.window()
-                    self.move_pointer(cur_y, move_to=True)
+                    self.move_pointer(cur_y + 1, move_to=True)
                 elif chr(c) in 'Uu':
                     cur_y = self.cur_y
                     self.items[cur_y].mark_as_unread()
