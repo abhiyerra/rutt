@@ -12,7 +12,7 @@
 
 ** Dependencies
    - Python 2.7
-   - [feedparser](http://feedparser.org/)
+   - [[http://feedparser.org/][feedparser]]
    - Elixir
    - elinks (For now.)
 
