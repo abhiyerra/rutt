@@ -1,3 +1,7 @@
+2010-12-31  Abhi Yerra  <abhi@berkeley.edu>
+
+	* Added Mark all as read in the Items feed.
+
 2010-12-29  Abhi Yerra  <abhi@berkeley.edu>
 
 	* I was getting an error opening pages that had unicode in them. I added the locale
