@@ -98,7 +98,7 @@ module Feed
        select f.*,
               (select count(*) from items iu where iu.feed_id = f.id) as num_items,
               (select count(*) from items ir where ir.read = 0 and ir.feed_id = f.id) as unread
-       from feeds f limit #{min_limit},#{max_limit}
+       from feeds f order by id desc limit #{min_limit},#{max_limit}
     })
   end
 
@@ -177,7 +177,7 @@ class Screen
     @max_y = @stdscr.getmaxy
 
     @min_limit = @min_y - 1
-    @max_limit = @max_y - 3
+    @max_limit = @max_y - 5
 
     @cur_y = 1
     @cur_x = 0
@@ -185,16 +185,16 @@ class Screen
 
   def incr_page
     @min_limit =  @max_limit
-    @max_limit += (@max_y - 3)
+    @max_limit += (@max_y - 5)
   end
 
   def decr_page
-    @max_limit = @min_limit
-    @min_limit -= (@max_y - 3)
+    @max_limit =  @min_limit
+    @min_limit -= (@max_y - 5)
 
     if @max_limit <= 0
       @min_limit = @min_y - 1
-      @max_limit = @max_y - 3
+      @max_limit = @max_y - 5
     end
   end
 
@@ -368,12 +368,12 @@ class ItemScreen < Screen
           window
           move_pointer(cur_y, move_to=true)
         when /m/i
-          cur_y = @cur_y
+          cur_y = @cur_y - 1
           Item::mark_as_read(@items[cur_y])
           window
           move_pointer(cur_y + 1, move_to=true)
         when /u/i
-          cur_y = @cur_y
+          cur_y = @cur_y - 1
           Item::mark_as_unread(@items[cur_y])
           window
           move_pointer(cur_y + 1, move_to=true)
@@ -415,10 +415,10 @@ class ContentScreen < Screen
     @content = `elinks -dump -dump-charset ascii -force-html #{@item['url']}`
     @content = @content.split("\n")
 
-    @stdscr.addstr("#{@item['title']} (#{@item['url']})\n")
+    @stdscr.addstr(" #{@item['title']} (#{@item['url']})\n\n")
 
     lines = @content[@min_limit..@max_limit]
-    lines.each { |line| @stdscr.addstr("#{line}\n") } if lines
+    lines.each { |line| @stdscr.addstr("  #{line}\n") } if lines
 
     @stdscr.refresh
   end
