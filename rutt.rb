@@ -104,7 +104,7 @@ module Feed
 
   def refresh
     feeds = $db.execute("select * from feeds")
-    results = Parallel.map(feeds) do |feed|
+    results = Parallel.map(feeds, :in_threads => 8) do |feed|
       refresh_for(feed)
     end
   end
