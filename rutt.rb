@@ -6,73 +6,131 @@ require 'ncurses'
 require 'rss/1.0'
 require 'rss/2.0'
 require 'open-uri'
-require 'dm-core'
-require 'dm-migrations'
+require 'sqlite3'
+require 'launchy'
 
+# gem install launchy
+# gem install sqlite3
+# gem install ncurses
 
-class Feed
-  include DataMapper::Resource
+$db = SQLite3::Database.new('rutt.db')
+$db.results_as_hash = true
 
-  property :id, Serial
-  property :title, String
-  property :url, String
-  property :created_at, DateTime
-  property :updated_at, DateTime
+module Config
 
-  has n, :items
+end
 
-  after :save, :refresh
+module Feed
+  extend self
 
-  before :destroy do
-    self.items.each do |item|
-      item.destroy
+  # before :destroy do
+  #   self.items.each do |item|
+  #     item.destroy
+  #   end
+  # end
+
+  def make_table!
+    $db.execute(%{
+         create table if not exists feeds (
+                      id integer PRIMARY KEY,
+                      title text,
+                      url text,
+                      update_interval integer default 3600,
+                      created_at NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                      updated_at NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                      UNIQUE(url))
+      })
+  end
+
+  def add(url)
+    $db.execute("insert or ignore into feeds (url) values ('#{url}')")
+    $db.execute("select * from feeds where id = (select last_insert_rowid())") do |feed|
+      refresh_for(feed)
     end
+  end
+
+  def get(id)
+
+  end
+
+  def delete(feed)
+    $db.execute("delete from feeds where id = ?", feed['id'])
+  end
+
+  def all
+    $db.execute(%{
+       select f.*,
+              (select count(*) from items iu where iu.feed_id = f.id) as num_items,
+              (select count(*) from items ir where ir.read = 0 and ir.feed_id = f.id) as unread
+       from feeds f
+    })
   end
 
   def refresh
-    content = open(sel.url).read
-    rss = RSS::Parser.parse(content, false)
-
-    self.title = rss.channel.title
-    rss.channel.items.each do |item|
-      Item.create({
-          :title        => item.title,
-          :url          => item.link,
-          :published_at => item.date,
-        })
+    $db.execute("select * from feeds") do |feed|
+      refresh_for(feed)
     end
   end
 
-  def unread
-    self.items.count(:is_read => false)
+  def refresh_for(feed)
+    content = open(feed['url']).read
+    rss = RSS::Parser.parse(content, false)
+
+    $db.execute("update feeds set title = ? where id = ?", rss.channel.title, feed['id'])
+
+    rss.channel.items.each do |item|
+      $db.execute("insert or ignore into items (feed_id, title, url, published_at) values (?, ?, ?, ?)", feed['id'], item.title, item.link, item.pubDate.to_i)
+    end
+  end
+
+  def unread(feed_id)
+    $db.execute("select * from items where feed_id = ? and read = 0", feed)
+  end
+
+  def mark_as_read(feed)
+    $db.execute("update items set read = 1 where feed_id = ?", feed['id'])
   end
 end
 
 
-class Item
-  include DataMapper::Resource
+module Item
 
-  property :id, Serial
+  extend self
 
-  property :title, String
-  property :url, String
-  property :description, Text
-  property :is_read, Boolean
-  property :like_this, Boolean
-  property :published_at, DateTime
-
-
-  def mark_as_read
-    self.is_read = true
-    self.save
+  def make_table!
+    $db.execute(%{
+      create table if not exists items (
+                      id integer PRIMARY KEY,
+                      feed_id integer,
+                      title text,
+                      url text,
+                      description text,
+                      read int default 0,
+                      prioritize int default 0,
+                      published_at DATE NOT NULL DEFAULT (datetime('now','localtime')),
+                      created_at NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                      updated_at NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                      UNIQUE(url),
+                      FOREIGN KEY(feed_id) REFERENCES feeds(id))
+    })
   end
 
-  def mark_as_unread
-    self.is_read = false
-    self.save
+  def all(feed=nil)
+    if feed
+      $db.execute("select * from items")
+    else
+      $db.execute("select * from items where feed_id = ?", feed)
+    end
+  end
+
+  def mark_as_unread(item)
+    $db.execute("update items set read = 0 where id = #{item['id']}")
+  end
+
+  def mark_as_read(item)
+    $db.execute("update items set read = 1 where id = #{item['id']}")
   end
 end
-
 
 class Screen
   def initialize(stdscr)
@@ -118,17 +176,18 @@ class FeedScreen < Screen
   end
 
   def reload_feeds
-    @_feeds = Feed.all
+    @_feeds = Feed::all
   end
 
   def display_feeds
     @cur_y = @min_y
 
     @_feeds[@limit[0]..@limit[1]].each do |feed|
-      next if feed.unread == 0
+
+#      next if feed.unread == 0
 
       @stdscr.move(@cur_y, 0)
-      @stdscr.addstr("  #{feed.unread}/#{feed.items.count}\t\t#{feed.title}\n")
+      @stdscr.addstr("  #{feed['unread']}/#{feed['num_items']}\t\t#{feed['title']}\n")
       @feeds[@cur_y] = feed
 
       @cur_y += 1
@@ -143,15 +202,16 @@ class FeedScreen < Screen
 
     @limit = [start_limit, end_limit] if start_limit || end_limit
 
+    reload_feeds
     display_menu
     display_feeds
     move_pointer(0)
   end
 
-  def event_loop
+  def loop
     window(0, @stdscr.getmaxy - 2)
 
-    loop do
+    while true do
       c = @stdscr.getch
 
       if c > 0 && c < 255
@@ -163,43 +223,41 @@ class FeedScreen < Screen
         when /r/i
           cur_y = @cur_y
 
-          Feed.all.each { |feed| feed.refresh }
+          Feed::refresh
 
-          reload_feeds
           window
-          move_pointer(cur_y, move_to=True)
+          move_pointer(cur_y, move_to=true)
         when /d/i
           cur_y = @cur_y
 
-          stdscr.clear()
-          display_menu()
+          @stdscr.clear
+          display_menu
           feed = @feeds[cur_y]
           @stdscr.move(2, 0)
-          @stdscr.addstr("Are you sure you want to delete #{feed.title}? ")
-          d = @stdscr.getch()
-          if chr(c) =~ /y/i
-            feed.remove
-            reload_feeds
+          @stdscr.addstr("Are you sure you want to delete #{feed['title']}? ")
+          d = @stdscr.getch
+          if d.chr =~ /y/i
+            Feed::delete(feed)
             window
-            move_pointer(cur_y, move_to=True)
+            move_pointer(cur_y, move_to=true)
           end
         when /p/i
-          window(@limit[0] - curses.LINES - 2, @limit[0])
+          window(@limit[0] - @stdscr.getmaxy - 2, @limit[0])
         when /n/i
-          window(@limit[1], @limit[1] + curses.LINES - 2)
+          window(@limit[1], @limit[1] + @stdscr.getmaxy - 2)
         when / /
           cur_y = @cur_y
           item_screen = ItemScreen.new(@stdscr, @feeds[cur_y])
-          item_screen.event_loop
+          item_screen.loop
 
           window
           move_pointer(cur_y, move_to=true)
         end
       else
         case c
-        when curses.KEY_UP
+        when Ncurses::KEY_UP
           move_pointer(-1)
-        when curses.KEY_DOWN
+        when Ncurses::KEY_DOWN
           move_pointer(1)
         end
       end
@@ -208,152 +266,166 @@ class FeedScreen < Screen
 end
 
 class ItemScreen < Screen
-  # def initialize(stdscr, feed)
-  #   @feed = feed
-  #   @items = {}
-  #   @menu = " i:quit r:refresh m:mark as read u:mark as unread a:mark all as read b:open in browser"
+  def initialize(stdscr, feed)
+    @feed = feed
+    @menu = " i:quit r:refresh m:mark as read u:mark as unread a:mark all as read b:open in browser"
 
-  #   super(stdscr)
-  # end
+    super(stdscr)
+  end
 
-  # def display_items
-  #   @cur_y = @min_y
+  def reload_items
+    @items = Item::all(@feed)
+  end
 
-  #   for item in @feed.items[@limit[0]..@limit[1]]:
-  #       @stdscr.addstr("  #{!item.is_read ? 'N' : ' '}\t#{item.published_at}\t#{item.title}\n")
+  def display_items
+    @cur_y = @min_y
 
-  #     @items[@cur_y] = item
-  #     @cur_y += 1
-  #   end
+    @items[@limit[0]..@limit[1]].each do |item|
+      @stdscr.addstr("  #{item['read'].to_i == 0 ? 'N' : ' '}\t#{item['published_at']}\t#{item['title']}\n")
 
-  #   @cur_y = @min_y
-  #   @stdscr.refresh
-  # end
+      @items[@cur_y] = item
+      @cur_y += 1
+    end
 
-  # def window(start_limit=nil, end_limit=nil)
-  #   @stdscr.clear
+    @cur_y = @min_y
+    @stdscr.refresh
+  end
 
-  #   if start_limit or end_limit:
-  #       @limit = [start_limit, end_limit]
-  #   end
+  def window(start_limit=nil, end_limit=nil)
+    @stdscr.clear
 
-  #   display_menu
-  #   display_items
-  #   move_pointer(0)
-  # end
+    @limit = [start_limit, end_limit] if start_limit || end_limit
 
-  # def event_loop
-  #   window(0, curses.LINES - 2)
+    reload_items
+    display_menu
+    display_items
+    move_pointer(0)
+  end
 
-  #   loop do
-  #     c = @stdscr.getch()
+  def loop
+    window(0, @stdscr.getmaxy - 2)
 
-  #     case chr(c)
-  #     when /[iq]/i
-  #       break
-  #     when /a/i
-  #       @feed.items.each { |item| item.mark_as_read }
+    while true do
+      c = @stdscr.getch
 
-  #       window
-  #       move_pointer(@cur_y, move_to=true)
-  #     when /p/i
-  #       window(@limit[1] - curses.LINES - 2, @limit[1])
-  #     when /n/i
-  #       window(@limit[1], @limit[1] + curses.LINES - 2)
-  #     when /b/i
-  #       cur_y = @cur_y
-  #       @items[cur_y].mark_as_read
-  #       webbrowser.open_new_tab(@items[cur_y].url)
-  #     when /m/i
-  #       cur_y = @cur_y
-  #       @items[cur_y].mark_as_read
-  #       window()
-  #       move_pointer(cur_y + 1, move_to=True)
-  #     when /u/i
-  #       cur_y = @cur_y
-  #       @items[cur_y].mark_as_unread()
-  #       window()
-  #       move_pointer(cur_y, move_to=True)
-  #     when /r/i
-  #       feed.refresh
-  #       window
-  #     when / /
-  #       cur_y = @cur_y
+      if c > 0 && c < 255
+        case c.chr
+        when /[iq]/i
+          break
+        when /a/i
+          Feed::mark_as_read(@feed)
+          window
+          move_pointer(@cur_y, move_to=true)
+        when /p/i
+          window(@limit[1] - @stdscr.getmaxy - 2, @limit[1])
+        when /n/i
+          window(@limit[1], @limit[1] + @stdscr.getmaxy - 2)
+        when /b/i
+          cur_y = @cur_y
+          Item::mark_as_read(@items[cur_y])
+          Launchy.open(@items[cur_y]['url'])
+        when /m/i
+          cur_y = @cur_y
+          Item::mark_as_read(@items[cur_y])
+          window
+          move_pointer(cur_y + 1, move_to=true)
+        when /u/i
+          cur_y = @cur_y
+          Item::mark_as_unread(@items[cur_y])
+          window
+          move_pointer(cur_y + 1, move_to=true)
+        when /r/i
+          Feed::refresh_for(@feed)
+          window
+        when / /
+          cur_y = @cur_y
 
-  #       content_screen = ContentScreen(@stdscr, @items[@cur_y])
-  #       content_screen.event_loop
+          content_screen = ContentScreen.new(@stdscr, @items[@cur_y])
+          content_screen.loop
 
-  #       window
-  #       move_pointer(cur_y, move_to=True)
-  #     end
-
-  #     case c
-  #     when curses.KEY_UP
-  #       move_pointer(-1)
-  #     when curses.KEY_DOWN
-  #       move_pointer(1)
-  #     end
-  #   end
-  # end
+          window
+          move_pointer(cur_y, move_to=true)
+        end
+      else
+        case c
+        when Ncurses::KEY_UP
+          move_pointer(-1)
+        when Ncurses::KEY_DOWN
+          move_pointer(1)
+        end
+      end
+    end
+  end
 end
 
 
 
 
 
-# class ContentScreen(Screen):
-#     def initialize(stdscr, item):
-#         self.item = item
-#       self.menu = "i:back b:open in browser"
-#     end
+class ContentScreen < Screen
+  def initialize(stdscr, item)
+    @item = item
+    @menu = "i:back b:open in browser"
 
+    super(stdscr)
+  end
 
-#     def get_content():
-#         render_cmd = "elinks -dump -dump-charset ascii -force-html %s" % self.item.url
-#         self.content = os.popen(render_cmd).read().encode("utf-8").split("\n")
+  def get_content
+    @content = `elinks -dump -dump-charset ascii -force-html #{@item['url']}`
+  end
 
-#     def move_pointer(pos):
-#         if self.cur_line + pos < 0:
-#             return
+  def move_pointer(pos)
+    return if @cur_line + pos < 0
 
-#         self.stdscr.addstr(1, 2, "%s (%s)\n" % (self.item.title, self.item.url), curses.A_BOLD)
+    @stdscr.addstr("#{@item['title']} (#{@item['url']})\n")
+    @cur_line += pos
 
-#         self.cur_line = self.cur_line + pos
+    lines = @content[@cur_line..@cur_line + @stdscr.getmaxy - 5]
+    cur_y = 2
 
-#         lines = self.content[self.cur_line:self.cur_line + curses.LINES - 5]
-#         cur_y = 2
-#         for line in lines:
-#             self.stdscr.addstr(cur_y, 2, "%s\n" % line)
-#             cur_y += 1
+    while cur_y < @cur_line + @stdscr.getmaxy - 5 do
+      @stdscr.addstr("#{lines[cur_y]}\n")
+      cur_y += 1
+    end
 
-#         self.stdscr.refresh()
+    @stdscr.refresh
+  end
 
-#     def window(pointer_pos):
-#         self.stdscr.clear()
-#         self.display_menu()
-#         self.move_pointer(pointer_pos)
+  def window(pointer_pos)
+    @stdscr.clear()
+    display_menu()
+    move_pointer(pointer_pos)
+  end
 
-#     def event_loop():
-#         self.cur_line = 0
-#         self.get_content()
-#         self.window(0)
+  def loop
+    @cur_line = 0
+    get_content()
+    window(0)
 
-#         while True:
-#             c = self.stdscr.getch()
-#             if 0 < c < 256:
-#                 if chr(c) in 'IiQq':
-#                     self.item.mark_as_read()
-#                     break
-#                 elif chr(c) in 'Bb':
-#                     webbrowser.open_new_tab(self.item.url)
-#                 elif chr(c) in ' ':
-#                     self.window(10)
-#             else:
-#                 if c == curses.KEY_UP:
-#                     self.window(-1)
-#                 elif c == curses.KEY_DOWN:
-#                     self.window(1)
+    while true do
+      c = @stdscr.getch()
+      if c > 0 && c < 255
+        case c.chr
+        when /iq/i
+          Item::mark_as_read(@item)
+          return
+        when /b/i
+          Launchy.open(@item['url'])
+        when / /i
+          window(10)
+        end
+      else
+        case c
+        when Ncurses::KEY_UP
+          window(-1)
+        when Ncurses::KEY_DOWN
+          window(1)
+        end
+      end
+    end
 
+  end
+end
 
 
 
@@ -374,24 +446,27 @@ def start_screen
   stdscr.clear
 
   feed_screen = FeedScreen.new(stdscr)
-  feed_screen.event_loop
+  feed_screen.loop
 ensure
   Ncurses.endwin()
 end
 
 
 def main
+  Feed::make_table!
+  Item::make_table!
+
   options = {}
   OptionParser.new do |opts|
     opts.banner = "Usage: rutt.rb [options]"
 
-    opts.on('-a', '--add FEED', "Add a feed") do |feed|
-      feed = Feed.new(url)
+    opts.on('-a', '--add FEED', "Add a feed") do |url|
+      Feed::add(url)
       exit
     end
 
-    opts.on('-r', '--reload', "Reload all feeds.") do
-      Feed.all.each { |f| f.reload }
+    opts.on('-r', '--refresh', "Refresh feeds.") do
+      Feed::refresh
       exit
     end
 
@@ -399,8 +474,6 @@ def main
 
   end.parse!
 
-  DataMapper.setup(:default, 'sqlite://rutt2.db')
-  DataMapper.auto_migrate!
 
   start_screen
 end
