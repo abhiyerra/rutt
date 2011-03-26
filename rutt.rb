@@ -1,17 +1,19 @@
 require 'rubygems'
+
+require 'launchy'
 require 'ncurses'
-require 'logger'
+require 'nokogiri'
+require 'open-uri'
 require 'optparse'
-require 'ncurses'
 require 'rss/1.0'
 require 'rss/2.0'
-require 'open-uri'
 require 'sqlite3'
-require 'launchy'
+require 'feedparser'
 
 # gem install launchy
 # gem install sqlite3
 # gem install ncurses
+# gem install ruby-feedparser
 
 $db = SQLite3::Database.new('rutt.db')
 $db.results_as_hash = true
@@ -20,14 +22,28 @@ module Config
 
 end
 
+module Opml
+  def self.get_urls(file)
+    doc = Nokogiri::XML(open(file))
+
+    urls = []
+
+    doc.xpath('opml/body/outline').each do |outline|
+      if outline['xmlUrl']
+        urls << outline['xmlUrl']
+      else
+        (outline/'outline').each do |outline2|
+          urls << outline2['xmlUrl']
+        end
+      end
+    end
+
+    return urls
+  end
+end
+
 module Feed
   extend self
-
-  # before :destroy do
-  #   self.items.each do |item|
-  #     item.destroy
-  #   end
-  # end
 
   def make_table!
     $db.execute(%{
@@ -42,11 +58,11 @@ module Feed
       })
   end
 
-  def add(url)
+  def add(url, refresh=true)
     $db.execute("insert or ignore into feeds (url) values ('#{url}')")
     $db.execute("select * from feeds where id = (select last_insert_rowid())") do |feed|
       refresh_for(feed)
-    end
+    end if refresh
   end
 
   def get(id)
@@ -54,6 +70,7 @@ module Feed
   end
 
   def delete(feed)
+    $db.execute("delete from items where feed_id = ?", feed['id'])
     $db.execute("delete from feeds where id = ?", feed['id'])
   end
 
@@ -74,12 +91,12 @@ module Feed
 
   def refresh_for(feed)
     content = open(feed['url']).read
-    rss = RSS::Parser.parse(content, false)
+    rss = FeedParser::Feed::new(content)
 
-    $db.execute("update feeds set title = ? where id = ?", rss.channel.title, feed['id'])
+    $db.execute("update feeds set title = ? where id = ?", rss.title, feed['id'])
 
-    rss.channel.items.each do |item|
-      $db.execute("insert or ignore into items (feed_id, title, url, published_at) values (?, ?, ?, ?)", feed['id'], item.title, item.link, item.pubDate.to_i)
+    rss.items.each do |item|
+      $db.execute("insert or ignore into items (feed_id, title, url, published_at) values (?, ?, ?, ?)", feed['id'], item.title, item.link, item.date.to_i)
     end
   end
 
@@ -467,6 +484,17 @@ def main
 
     opts.on('-r', '--refresh', "Refresh feeds.") do
       Feed::refresh
+      exit
+    end
+
+    opts.on('-o', '--import-opml FILE', "Import opml") do |file|
+      urls = Opml::get_urls(file)
+
+      urls.each do |url|
+        puts "Adding #{url}"
+        Feed::add(url, false)
+      end
+
       exit
     end
 
