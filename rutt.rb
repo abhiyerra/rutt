@@ -9,11 +9,13 @@ require 'rss/1.0'
 require 'rss/2.0'
 require 'sqlite3'
 require 'feedparser'
+require 'parallel'
 
 # gem install launchy
 # gem install sqlite3
 # gem install ncurses
 # gem install ruby-feedparser
+# gem install parallel
 
 $db = SQLite3::Database.new('rutt.db')
 $db.results_as_hash = true
@@ -101,7 +103,8 @@ module Feed
   end
 
   def refresh
-    $db.execute("select * from feeds") do |feed|
+    feeds = $db.execute("select * from feeds")
+    results = Parallel.map(feeds) do |feed|
       refresh_for(feed)
     end
   end
@@ -109,6 +112,8 @@ module Feed
   def refresh_for(feed)
     content = open(feed['url']).read
     rss = FeedParser::Feed::new(content)
+
+    puts rss.title
 
     $db.execute("update feeds set title = ? where id = ?", rss.title, feed['id'])
 
@@ -187,7 +192,7 @@ class Screen
     @max_limit = @min_limit
     @min_limit -= (@max_y - 3)
 
-    if @max_limit < 0
+    if @max_limit <= 0
       @min_limit = @min_y - 1
       @max_limit = @max_y - 3
     end
@@ -361,7 +366,7 @@ class ItemScreen < Screen
           Item::mark_as_read(@items[cur_y])
           Launchy.open(@items[cur_y]['url'])
           window
-          move_pointer(cur_y + 1, move_to=true)
+          move_pointer(cur_y, move_to=true)
         when /m/i
           cur_y = @cur_y
           Item::mark_as_read(@items[cur_y])
@@ -376,11 +381,11 @@ class ItemScreen < Screen
           Feed::refresh_for(@feed)
           window
         when / /
-          content_screen = ContentScreen.new(@stdscr, @items[cur_y - 1])
+          content_screen = ContentScreen.new(@stdscr, @items[@cur_y - 1])
           content_screen.loop
 
           window
-          move_pointer(cur_y, move_to=true)
+          move_pointer(@cur_y, move_to=true)
         end
       else
         case c
@@ -406,56 +411,47 @@ class ContentScreen < Screen
     super(stdscr)
   end
 
-  def get_content
+  def display_content
     @content = `elinks -dump -dump-charset ascii -force-html #{@item['url']}`
-  end
-
-  def move_pointer(pos)
-    return if @cur_line + pos < 0
+    @content = @content.split("\n")
 
     @stdscr.addstr("#{@item['title']} (#{@item['url']})\n")
-    @cur_line += pos
 
-    lines = @content[@cur_line..@cur_line + @stdscr.getmaxy - 5]
-    cur_y = 2
-
-    while cur_y < @cur_line + @stdscr.getmaxy - 5 do
-      @stdscr.addstr("#{lines[cur_y]}\n")
-      cur_y += 1
-    end
+    lines = @content[@min_limit..@max_limit]
+    lines.each { |line| @stdscr.addstr("#{line}\n") } if lines
 
     @stdscr.refresh
   end
 
-  def window(pointer_pos)
+  def window
     @stdscr.clear
     display_menu
-    move_pointer(pointer_pos)
+    display_content
   end
 
   def loop
     @cur_line = 0
-    get_content()
-    window(0)
+
+    window
 
     while true do
-      c = @stdscr.getch()
+      c = @stdscr.getch
       if c > 0 && c < 255
         case c.chr
-        when /iq/i
+        when /[iq]/i
           Item::mark_as_read(@item)
-          return
+          break
         when /b/i
           Launchy.open(@item['url'])
-        when / /i
-          window(10)
         end
       else
         case c
         when Ncurses::KEY_UP
-          window(-1)
+          decr_page
+          window
         when Ncurses::KEY_DOWN
-          window(1)
+          incr_page
+          window
         end
       end
     end
@@ -472,12 +468,6 @@ def start_screen
   Ncurses.cbreak();
   Ncurses.noecho();
   Ncurses.keypad(stdscr, true);
-
-  # Initialize few color pairs
-  # Ncurses.init_pair(1, COLOR_RED, COLOR_BLACK);
-  # Ncurses.init_pair(2, COLOR_BLACK, COLOR_WHITE);
-  # Ncurses.init_pair(3, COLOR_BLACK, COLOR_BLUE);
-  # stdscr.bkgd(Ncurses.COLOR_PAIR(2));
 
   stdscr.clear
 
