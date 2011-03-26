@@ -11,9 +11,7 @@
    stable.
 
 ** Dependencies
-   - Python 2.7
-   - [[http://feedparser.org/][feedparser]]
-   - Elixir
+   - Ruby 1.8
    - elinks (For now.)
 
 ** Download & Repository
