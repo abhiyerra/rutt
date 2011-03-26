@@ -91,12 +91,12 @@ module Feed
     $db.execute("delete from feeds where id = ?", feed['id'])
   end
 
-  def all
+  def all(min_limit=0, max_limit=-1)
     $db.execute(%{
        select f.*,
               (select count(*) from items iu where iu.feed_id = f.id) as num_items,
               (select count(*) from items ir where ir.read = 0 and ir.feed_id = f.id) as unread
-       from feeds f
+       from feeds f limit #{min_limit},#{max_limit}
     })
   end
 
@@ -151,12 +151,8 @@ module Item
     })
   end
 
-  def all(feed=nil)
-    if feed
-      $db.execute("select * from items")
-    else
-      $db.execute("select * from items where feed_id = ?", feed)
-    end
+  def all(feed, min_limit=0, max_limit=-1)
+    $db.execute("select * from items where feed_id = ? limit #{min_limit},#{max_limit}", feed['id'])
   end
 
   def mark_as_unread(item)
@@ -175,8 +171,26 @@ class Screen
     @min_y = 1
     @max_y = @stdscr.getmaxy
 
+    @min_limit = @min_y - 1
+    @max_limit = @max_y - 3
+
     @cur_y = 1
     @cur_x = 0
+  end
+
+  def incr_page
+    @min_limit =  @max_limit
+    @max_limit += (@max_y - 3)
+  end
+
+  def decr_page
+    @max_limit = @min_limit
+    @min_limit -= (@max_y - 3)
+
+    if @max_limit < 0
+      @min_limit = @min_y - 1
+      @max_limit = @max_y - 3
+    end
   end
 
   def display_menu
@@ -203,28 +217,20 @@ end
 
 class FeedScreen < Screen
   def initialize(stdscr)
-    @feeds = {}
     @menu = "q:Quit d:delete r:refresh all"
 
-    reload_feeds
-
     super(stdscr)
-  end
-
-  def reload_feeds
-    @_feeds = Feed::all
   end
 
   def display_feeds
     @cur_y = @min_y
 
-    @_feeds[@limit[0]..@limit[1]].each do |feed|
-
-      next if feed['unread'] == 0
+    @feeds = Feed::all(@min_limit, @max_limit)
+    @feeds.each do |feed|
+ #     next if feed['unread'] == 0  # This should be configurable: feed.showread
 
       @stdscr.move(@cur_y, 0)
       @stdscr.addstr("  #{feed['unread']}/#{feed['num_items']}\t\t#{feed['title']}\n")
-      @feeds[@cur_y] = feed
 
       @cur_y += 1
     end
@@ -233,19 +239,16 @@ class FeedScreen < Screen
     @stdscr.refresh
   end
 
-  def window(start_limit=nil, end_limit=nil)
+  def window
     @stdscr.clear
 
-    @limit = [start_limit, end_limit] if start_limit || end_limit
-
-    reload_feeds
     display_menu
     display_feeds
     move_pointer(0)
   end
 
   def loop
-    window(0, @stdscr.getmaxy - 2)
+    window
 
     while true do
       c = @stdscr.getch
@@ -278,12 +281,15 @@ class FeedScreen < Screen
             move_pointer(cur_y, move_to=true)
           end
         when /p/i
-          window(@limit[0] - @stdscr.getmaxy - 2, @limit[0])
+          decr_page
+          window
         when /n/i
-          window(@limit[1], @limit[1] + @stdscr.getmaxy - 2)
+          incr_page
+          window
         when / /
           cur_y = @cur_y
-          item_screen = ItemScreen.new(@stdscr, @feeds[cur_y])
+          @stdscr.addstr("#{@feeds[cur_y]}")
+          item_screen = ItemScreen.new(@stdscr, @feeds[cur_y - 1])
           item_screen.loop
 
           window
@@ -309,17 +315,12 @@ class ItemScreen < Screen
     super(stdscr)
   end
 
-  def reload_items
-    @items = Item::all(@feed)
-  end
-
   def display_items
     @cur_y = @min_y
 
-    @items[@limit[0]..@limit[1]].each do |item|
+    @items = Item::all(@feed, @min_limit, @max_limit)
+    @items.each do |item|
       @stdscr.addstr("  #{item['read'].to_i == 0 ? 'N' : ' '}\t#{item['published_at']}\t#{item['title']}\n")
-
-      @items[@cur_y] = item
       @cur_y += 1
     end
 
@@ -327,19 +328,16 @@ class ItemScreen < Screen
     @stdscr.refresh
   end
 
-  def window(start_limit=nil, end_limit=nil)
+  def window
     @stdscr.clear
 
-    @limit = [start_limit, end_limit] if start_limit || end_limit
-
-    reload_items
     display_menu
     display_items
     move_pointer(0)
   end
 
   def loop
-    window(0, @stdscr.getmaxy - 2)
+    window
 
     while true do
       c = @stdscr.getch
@@ -353,13 +351,17 @@ class ItemScreen < Screen
           window
           move_pointer(@cur_y, move_to=true)
         when /p/i
-          window(@limit[1] - @stdscr.getmaxy - 2, @limit[1])
+          decr_page
+          window
         when /n/i
-          window(@limit[1], @limit[1] + @stdscr.getmaxy - 2)
+          incr_page
+          window
         when /b/i
-          cur_y = @cur_y
+          cur_y = @cur_y - 1
           Item::mark_as_read(@items[cur_y])
           Launchy.open(@items[cur_y]['url'])
+          window
+          move_pointer(cur_y + 1, move_to=true)
         when /m/i
           cur_y = @cur_y
           Item::mark_as_read(@items[cur_y])
@@ -374,9 +376,7 @@ class ItemScreen < Screen
           Feed::refresh_for(@feed)
           window
         when / /
-          cur_y = @cur_y
-
-          content_screen = ContentScreen.new(@stdscr, @items[@cur_y])
+          content_screen = ContentScreen.new(@stdscr, @items[cur_y - 1])
           content_screen.loop
 
           window
@@ -428,8 +428,8 @@ class ContentScreen < Screen
   end
 
   def window(pointer_pos)
-    @stdscr.clear()
-    display_menu()
+    @stdscr.clear
+    display_menu
     move_pointer(pointer_pos)
   end
 
