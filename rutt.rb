@@ -19,7 +19,24 @@ $db = SQLite3::Database.new('rutt.db')
 $db.results_as_hash = true
 
 module Config
+  extend self
 
+  def make_table!
+    $db.execute(%{
+         create table if not exists config (
+                      id integer PRIMARY KEY,
+                      key text,
+                      value text,
+                      UNIQUE(key))
+      })
+  end
+
+  def get key
+  end
+
+  def set key, value
+
+  end
 end
 
 module Opml
@@ -98,6 +115,8 @@ module Feed
     rss.items.each do |item|
       $db.execute("insert or ignore into items (feed_id, title, url, published_at) values (?, ?, ?, ?)", feed['id'], item.title, item.link, item.date.to_i)
     end
+  rescue Exception => e
+    # no-op
   end
 
   def unread(feed_id)
@@ -161,7 +180,7 @@ class Screen
   end
 
   def display_menu
-    @stdscr.clear()
+    @stdscr.clear
     @stdscr.move(0, 0)
     @stdscr.addstr(" rutt #{@menu}\n")
   end
@@ -201,7 +220,7 @@ class FeedScreen < Screen
 
     @_feeds[@limit[0]..@limit[1]].each do |feed|
 
-#      next if feed.unread == 0
+      next if feed['unread'] == 0
 
       @stdscr.move(@cur_y, 0)
       @stdscr.addstr("  #{feed['unread']}/#{feed['num_items']}\t\t#{feed['title']}\n")
@@ -470,6 +489,7 @@ end
 
 
 def main
+  Config::make_table!
   Feed::make_table!
   Item::make_table!
 
