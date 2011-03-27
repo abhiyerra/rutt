@@ -152,7 +152,7 @@ module Item
   end
 
   def all(feed, min_limit=0, max_limit=-1)
-    $db.execute("select * from items where feed_id = ? limit #{min_limit},#{max_limit}", feed['id'])
+    $db.execute("select * from items where feed_id = ? order by id desc limit #{min_limit},#{max_limit}", feed['id'])
   end
 
   def mark_as_unread(item)
@@ -320,7 +320,7 @@ class ItemScreen < Screen
 
     @items = Item::all(@feed, @min_limit, @max_limit)
     @items.each do |item|
-      @stdscr.addstr("  #{item['read'].to_i == 0 ? 'N' : ' '}\t#{item['published_at']}\t#{item['title']}\n")
+      @stdscr.addstr("  #{item['read'].to_i == 0 ? 'N' : ' '}\t#{Time.at(item['published_at']).strftime("%b %d, %Y %R:%M")}\t#{item['title']}\n")
       @cur_y += 1
     end
 
