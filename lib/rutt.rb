@@ -11,12 +11,6 @@ require 'sqlite3'
 require 'feedparser'
 require 'parallel'
 
-# gem install launchy
-# gem install sqlite3
-# gem install ncurses
-# gem install ruby-feedparser
-# gem install parallel
-
 $db = SQLite3::Database.new('rutt.db')
 $db.results_as_hash = true
 
