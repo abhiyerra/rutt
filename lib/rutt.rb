@@ -33,11 +33,12 @@ module Config
       })
   end
 
-  def get key
+  def get(key)
+    $db.execute("select key, value from config where key = ?", key)
   end
 
-  def set key, value
-
+  def set(key, value)
+    $db.execute("insert or update config(key, value) values (?, ?)", key, value)
   end
 end
 
@@ -98,7 +99,7 @@ module Feed
        select f.*,
               (select count(*) from items iu where iu.feed_id = f.id) as num_items,
               (select count(*) from items ir where ir.read = 0 and ir.feed_id = f.id) as unread
-       from feeds f order by id desc limit #{min_limit},#{max_limit}
+       from feeds f where unread > 0 order by id desc limit #{min_limit},#{max_limit}
     })
   end
 
