@@ -16,7 +16,7 @@ Jeweler::Tasks.new do |gem|
   gem.homepage = "http://github.com/abhiyerra/rutt"
   gem.license = "BSD"
   gem.summary = %Q{The Mutt of RSS/Atom feeds.}
-  gem.description = %Q{Read RSS feeds from the commandline }
+  gem.description = %Q{The Mutt of RSS/Atom feeds.}
   gem.email = "abhi@berkeley.edu"
   gem.authors = ["Abhi Yerra"]
 end
