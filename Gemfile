@@ -2,9 +2,11 @@ source "http://rubygems.org"
 
 gem "launchy"
 gem "ncurses"
+gem "nokogiri"
 gem "parallel"
 gem "ruby-feedparser"
 gem "sqlite3"
+gem "oauth"
 
 group :development do
   gem "rspec", "~> 2.3.0"

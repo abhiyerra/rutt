@@ -1,19 +1,3 @@
-require 'rubygems'
-
-require 'launchy'
-require 'ncurses'
-require 'nokogiri'
-require 'open-uri'
-require 'optparse'
-require 'rss/1.0'
-require 'rss/2.0'
-require 'sqlite3'
-require 'feedparser'
-require 'parallel'
-
-$db = SQLite3::Database.new('rutt.db')
-$db.results_as_hash = true
-
 module Config
   extend self
 
@@ -28,11 +12,11 @@ module Config
   end
 
   def get(key)
-    $db.execute("select key, value from config where key = ?", key)
+    $db.get_first_value("select value from config where key = ?", key)
   end
 
   def set(key, value)
-    $db.execute("insert or update config(key, value) values (?, ?)", key, value)
+    $db.execute("insert or replace into config(key, value) values (?, ?)", key, value)
   end
 end
 
@@ -152,7 +136,7 @@ module Item
   end
 
   def all(feed, min_limit=0, max_limit=-1)
-    $db.execute("select * from items where feed_id = ? order by id desc limit #{min_limit},#{max_limit}", feed['id'])
+    $db.execute("select * from items where feed_id = ? order by published_at desc limit #{min_limit},#{max_limit}", feed['id'])
   end
 
   def mark_as_unread(item)
@@ -161,6 +145,10 @@ module Item
 
   def mark_as_read(item)
     $db.execute("update items set read = 1 where id = #{item['id']}")
+  end
+
+  def sent_to_instapaper(item)
+    $db.execute("update items set read = 2 where id = #{item['id']}")
   end
 end
 
@@ -267,7 +255,7 @@ class FeedScreen < Screen
           window
           move_pointer(cur_y, move_to=true)
         when /d/i
-          cur_y = @cur_y
+          cur_y = @cur_y - 1
 
           @stdscr.clear
           display_menu
@@ -277,9 +265,9 @@ class FeedScreen < Screen
           d = @stdscr.getch
           if d.chr =~ /y/i
             Feed::delete(feed)
-            window
-            move_pointer(cur_y, move_to=true)
           end
+          window
+          move_pointer(cur_y, move_to=true)
         when /p/i
           decr_page
           window
@@ -320,7 +308,13 @@ class ItemScreen < Screen
 
     @items = Item::all(@feed, @min_limit, @max_limit)
     @items.each do |item|
-      @stdscr.addstr("  #{item['read'].to_i == 0 ? 'N' : ' '}\t#{Time.at(item['published_at']).strftime("%b %d, %Y %R:%M")}\t#{item['title']}\n")
+      item_status = case item['read'].to_i
+                    when 0 then 'N'
+                    when 1 then ' '
+                    when 2 then 'I'
+                    else ' '
+                    end
+      @stdscr.addstr("  #{item_status}\t#{Time.at(item['published_at']).strftime("%b %d, %Y %R:%M")}\t#{item['title']}\n")
       @cur_y += 1
     end
 
@@ -346,6 +340,15 @@ class ItemScreen < Screen
         case c.chr
         when /[iq]/i
           break
+        when /s/i
+          cur_y = @cur_y - 1
+          $instapaper.request('/api/1/bookmarks/add', {
+              'url'   => @items[cur_y]['url'],
+              'title' => @items[cur_y]['title'],
+            })
+          Item::sent_to_instapaper(@items[cur_y])
+          window
+          move_pointer(@cur_y, move_to=true)
         when /a/i
           Feed::mark_as_read(@feed)
           window
@@ -361,7 +364,7 @@ class ItemScreen < Screen
           Item::mark_as_read(@items[cur_y])
           Launchy.open(@items[cur_y]['url'])
           window
-          move_pointer(cur_y, move_to=true)
+          move_pointer(@cur_y, move_to=true)
         when /m/i
           cur_y = @cur_y - 1
           Item::mark_as_read(@items[cur_y])
@@ -472,43 +475,3 @@ ensure
   Ncurses.endwin()
 end
 
-
-def main
-  Config::make_table!
-  Feed::make_table!
-  Item::make_table!
-
-  options = {}
-  OptionParser.new do |opts|
-    opts.banner = "Usage: rutt.rb [options]"
-
-    opts.on('-a', '--add FEED', "Add a feed") do |url|
-      Feed::add(url)
-      exit
-    end
-
-    opts.on('-r', '--refresh', "Refresh feeds.") do
-      Feed::refresh
-      exit
-    end
-
-    opts.on('-o', '--import-opml FILE', "Import opml") do |file|
-      urls = Opml::get_urls(file)
-
-      urls.each do |url|
-        puts "Adding #{url}"
-        Feed::add(url, false)
-      end
-
-      exit
-    end
-
-#    opts.on('-l', '--list-feeds', action='store_true', help="List the feeds")
-
-  end.parse!
-
-
-  start_screen
-end
-
-main

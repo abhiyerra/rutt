@@ -22,9 +22,11 @@ Jeweler::Tasks.new do |gem|
 
   gem.add_runtime_dependency "launchy"
   gem.add_runtime_dependency "ncurses"
+  gem.add_runtime_dependency "nokogiri"
   gem.add_runtime_dependency "parallel"
   gem.add_runtime_dependency "ruby-feedparser"
   gem.add_runtime_dependency "sqlite3"
+  gem.add_runtime_dependency "oauth"
 end
 Jeweler::RubygemsDotOrgTasks.new
 
