@@ -16,7 +16,7 @@ require 'instapaper'
 require 'oauth'
 
 require 'rutt'
-require 'instapaper'
+require 'rutt/instapaper'
 
 $db = SQLite3::Database.new('rutt.db')
 $db.results_as_hash = true
