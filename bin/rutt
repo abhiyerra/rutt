@@ -16,44 +16,60 @@ require 'instapaper'
 require 'oauth'
 
 require 'rutt'
-require 'rutt/instapaper'
 
 $db = SQLite3::Database.new('rutt.db')
 $db.results_as_hash = true
 
+def start_screen
+  stdscr = Ncurses.initscr()
+
+  Ncurses.start_color();
+  Ncurses.cbreak();
+  Ncurses.noecho();
+  Ncurses.keypad(stdscr, true);
+
+  stdscr.clear
+
+  feed_screen = Rutt::FeedScreen.new(stdscr)
+  feed_screen.loop
+ensure
+  Ncurses.endwin()
+end
+
+
 def main
 
-  Config::make_table!
-  Feed::make_table!
-  Item::make_table!
+  Rutt::Config.make_table!
+  Rutt::Feed.make_table!
+  Rutt::Item.make_table!
 
   options = {}
   OptionParser.new do |opts|
     opts.banner = "Usage: rutt.rb [options]"
 
     opts.on('-a', '--add FEED', "Add a feed") do |url|
-      Feed::add(url)
+      Rutt::Feed::add(url)
       exit
     end
 
     opts.on('-r', '--refresh', "Refresh feeds.") do
-      Feed::refresh
+      Rutt::Feed::refresh
       exit
     end
 
     opts.on('-o', '--import-opml FILE', "Import opml") do |file|
-      urls = Opml::get_urls(file)
+      urls = Rutt::Opml::get_urls(file)
 
       urls.each do |url|
         puts "Adding #{url}"
-        Feed::add(url, false)
+        Rutt::Feed::add(url, false)
       end
 
       exit
     end
 
     opts.on('-s', '--set-key', "Set config") do |key, value|
-      Config.set(ARGV[0], ARGV[1])
+      Rutt::Config.set(ARGV[0], ARGV[1])
       exit
     end
 
@@ -61,12 +77,12 @@ def main
 
   end.parse!
 
-  consumer_key    = Config.get("instapaper.consumer-key")
-  consumer_secret = Config.get("instapaper.consumer-secret")
-  username        = Config.get("instapaper.username")
-  password        = Config.get("instapaper.password")
+  consumer_key    = Rutt::Config.get("instapaper.consumer-key")
+  consumer_secret = Rutt::Config.get("instapaper.consumer-secret")
+  username        = Rutt::Config.get("instapaper.username")
+  password        = Rutt::Config.get("instapaper.password")
 
-  $instapaper = Instapaper::API.new(consumer_key, consumer_secret)
+  $instapaper = Rutt::Instapaper::API.new(consumer_key, consumer_secret)
   $instapaper.authorize(username, password)
 
   start_screen
