@@ -13,6 +13,7 @@ GEM
       rake (>= 0.8.1)
     ncurses (0.9.1)
     nokogiri (1.4.4)
+    oauth (0.4.4)
     parallel (0.5.3)
     rake (0.8.7)
     rcov (0.9.9)
@@ -36,6 +37,7 @@ DEPENDENCIES
   launchy
   ncurses
   nokogiri
+  oauth
   parallel
   rcov
   rspec (~> 2.3.0)
