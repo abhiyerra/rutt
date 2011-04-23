@@ -5,7 +5,7 @@
 
 Gem::Specification.new do |s|
   s.name = %q{rutt}
-  s.version = "0.3.1"
+  s.version = "0.3.2"
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.authors = ["Abhi Yerra"]
@@ -16,7 +16,7 @@ Gem::Specification.new do |s|
   s.executables = ["rutt"]
   s.extra_rdoc_files = [
     "LICENSE.txt",
-    "README.org"
+    "README.md"
   ]
   s.files = [
     ".document",
@@ -24,7 +24,7 @@ Gem::Specification.new do |s|
     "Gemfile",
     "Gemfile.lock",
     "LICENSE.txt",
-    "README.org",
+    "README.md",
     "Rakefile",
     "VERSION",
     "bin/rutt",
