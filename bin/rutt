@@ -13,6 +13,7 @@ require 'sqlite3'
 require 'feedparser'
 require 'parallel'
 require 'instapaper'
+require 'oauth'
 
 require 'rutt'
 require 'instapaper'

@@ -1,7 +1,3 @@
-# -*- coding: utf-8 -*-
-require 'rubygems'
-require 'oauth'
-
 module Instapaper
   class API
     Url = "http://www.instapaper.com"
