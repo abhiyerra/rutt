@@ -27,4 +27,5 @@ check out the [repository](https://github.com/abhiyerra/rutt) to use it.
  - https://github.com/abhiyerra/rutt
 
 Install via gem:
+
     gem install rutt
