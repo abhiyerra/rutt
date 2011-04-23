@@ -5,13 +5,13 @@
 
 Gem::Specification.new do |s|
   s.name = %q{rutt}
-  s.version = "0.3.2"
+  s.version = "0.3.3"
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.authors = ["Abhi Yerra"]
   s.date = %q{2011-04-23}
   s.default_executable = %q{rutt}
-  s.description = %q{Read RSS feeds from the commandline }
+  s.description = %q{The Mutt of RSS/Atom feeds.}
   s.email = %q{abhi@berkeley.edu}
   s.executables = ["rutt"]
   s.extra_rdoc_files = [
@@ -28,8 +28,16 @@ Gem::Specification.new do |s|
     "Rakefile",
     "VERSION",
     "bin/rutt",
-    "lib/instapaper.rb",
     "lib/rutt.rb",
+    "lib/rutt/config.rb",
+    "lib/rutt/content_screen.rb",
+    "lib/rutt/feed.rb",
+    "lib/rutt/feed_screen.rb",
+    "lib/rutt/instapaper.rb",
+    "lib/rutt/item.rb",
+    "lib/rutt/item_screen.rb",
+    "lib/rutt/opml.rb",
+    "lib/rutt/screen.rb",
     "rutt.gemspec",
     "spec/rutt_spec.rb",
     "spec/spec_helper.rb"
