@@ -19,14 +19,6 @@ Jeweler::Tasks.new do |gem|
   gem.description = %Q{Read RSS feeds from the commandline }
   gem.email = "abhi@berkeley.edu"
   gem.authors = ["Abhi Yerra"]
-
-  gem.add_runtime_dependency "launchy"
-  gem.add_runtime_dependency "ncurses"
-  gem.add_runtime_dependency "nokogiri"
-  gem.add_runtime_dependency "parallel"
-  gem.add_runtime_dependency "ruby-feedparser"
-  gem.add_runtime_dependency "sqlite3"
-  gem.add_runtime_dependency "oauth"
 end
 Jeweler::RubygemsDotOrgTasks.new
 
