@@ -30,7 +30,7 @@ def start_screen
 
   stdscr.clear
 
-  feed_screen = Rutt::FeedScreen.new(stdscr)
+  feed_screen = Rutt::Screen::Feed.new(stdscr)
   feed_screen.loop
 ensure
   Ncurses.endwin()
@@ -39,21 +39,21 @@ end
 
 def main
 
-  Rutt::Config.make_table!
-  Rutt::Feed.make_table!
-  Rutt::Item.make_table!
+  Rutt::DB::Config.make_table!
+  Rutt::DB::Feed.make_table!
+  Rutt::DB::Item.make_table!
 
   options = {}
   OptionParser.new do |opts|
     opts.banner = "Usage: rutt.rb [options]"
 
     opts.on('-a', '--add FEED', "Add a feed") do |url|
-      Rutt::Feed::add(url)
+      Rutt::DB::Feed::add(url)
       exit
     end
 
     opts.on('-r', '--refresh', "Refresh feeds.") do
-      Rutt::Feed::refresh
+      Rutt::DB::Feed::refresh
       exit
     end
 
@@ -62,14 +62,14 @@ def main
 
       urls.each do |url|
         puts "Adding #{url}"
-        Rutt::Feed::add(url, false)
+        Rutt::DB::Feed::add(url, false)
       end
 
       exit
     end
 
     opts.on('-s', '--set-key', "Set config") do |key, value|
-      Rutt::Config.set(ARGV[0], ARGV[1])
+      Rutt::DB::Config.set(ARGV[0], ARGV[1])
       exit
     end
 
@@ -77,10 +77,10 @@ def main
 
   end.parse!
 
-  consumer_key    = Rutt::Config.get("instapaper.consumer-key")
-  consumer_secret = Rutt::Config.get("instapaper.consumer-secret")
-  username        = Rutt::Config.get("instapaper.username")
-  password        = Rutt::Config.get("instapaper.password")
+  consumer_key    = Rutt::DB::Config.get("instapaper.consumer-key")
+  consumer_secret = Rutt::DB::Config.get("instapaper.consumer-secret")
+  username        = Rutt::DB::Config.get("instapaper.username")
+  password        = Rutt::DB::Config.get("instapaper.password")
 
   $instapaper = Rutt::Instapaper::API.new(consumer_key, consumer_secret)
   $instapaper.authorize(username, password)

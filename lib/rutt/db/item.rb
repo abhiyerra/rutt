@@ -1,11 +1,12 @@
 module Rutt
-  module Item
+  module DB
+    module Item
 
-    extend self
+      extend self
 
-    def make_table!
-      $db.execute(%{
-      create table if not exists items (
+      def make_table!
+        $db.execute(%{
+          create table if not exists items (
                       id integer PRIMARY KEY,
                       feed_id integer,
                       title text,
@@ -18,23 +19,25 @@ module Rutt
                       updated_at NOT NULL DEFAULT CURRENT_TIMESTAMP,
                       UNIQUE(url),
                       FOREIGN KEY(feed_id) REFERENCES feeds(id))
-    })
-    end
+        })
+      end
 
-    def all(feed, min_limit=0, max_limit=-1)
-      $db.execute("select * from items where feed_id = ? order by published_at desc limit #{min_limit},#{max_limit}", feed['id'])
-    end
+      def all(feed, min_limit=0, max_limit=-1)
+        $db.execute("select * from items where feed_id = ? order by published_at desc limit #{min_limit},#{max_limit}", feed['id'])
+      end
 
-    def mark_as_unread(item)
-      $db.execute("update items set read = 0 where id = #{item['id']}")
-    end
+      def mark_as_unread(item)
+        $db.execute("update items set read = 0 where id = #{item['id']}")
+      end
 
-    def mark_as_read(item)
-      $db.execute("update items set read = 1 where id = #{item['id']}")
-    end
+      def mark_as_read(item)
+        $db.execute("update items set read = 1 where id = #{item['id']}")
+      end
 
-    def sent_to_instapaper(item)
-      $db.execute("update items set read = 2 where id = #{item['id']}")
+      # Weak abstraction.
+      def sent_to_instapaper(item)
+        $db.execute("update items set read = 2 where id = #{item['id']}")
+      end
     end
   end
 end

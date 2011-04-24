@@ -1,9 +1,10 @@
-require 'rutt/config'
-require 'rutt/opml'
-require 'rutt/share/instapaper'
+require 'rutt/db/config'
 require 'rutt/db/feed'
 require 'rutt/db/item'
 require 'rutt/screen'
 require 'rutt/screen/feed'
 require 'rutt/screen/item'
 require 'rutt/screen/content'
+require 'rutt/share/instapaper'
+require 'rutt/opml'
+
