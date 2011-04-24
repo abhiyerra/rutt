@@ -1,5 +1,5 @@
 rutt.db
-
+*.rbc
 # rcov generated
 coverage
 
