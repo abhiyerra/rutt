@@ -5,11 +5,11 @@
 
 Gem::Specification.new do |s|
   s.name = %q{rutt}
-  s.version = "0.3.3"
+  s.version = "0.4.0"
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.authors = ["Abhi Yerra"]
-  s.date = %q{2011-04-23}
+  s.date = %q{2011-05-19}
   s.default_executable = %q{rutt}
   s.description = %q{The Mutt of RSS/Atom feeds.}
   s.email = %q{abhi@berkeley.edu}
@@ -29,15 +29,15 @@ Gem::Specification.new do |s|
     "VERSION",
     "bin/rutt",
     "lib/rutt.rb",
-    "lib/rutt/config.rb",
-    "lib/rutt/content_screen.rb",
-    "lib/rutt/feed.rb",
-    "lib/rutt/feed_screen.rb",
-    "lib/rutt/instapaper.rb",
-    "lib/rutt/item.rb",
-    "lib/rutt/item_screen.rb",
+    "lib/rutt/db/config.rb",
+    "lib/rutt/db/feed.rb",
+    "lib/rutt/db/item.rb",
     "lib/rutt/opml.rb",
     "lib/rutt/screen.rb",
+    "lib/rutt/screen/content.rb",
+    "lib/rutt/screen/feed.rb",
+    "lib/rutt/screen/item.rb",
+    "lib/rutt/share/instapaper.rb",
     "rutt.gemspec",
     "spec/rutt_spec.rb",
     "spec/spec_helper.rb"
@@ -63,6 +63,7 @@ Gem::Specification.new do |s|
       s.add_runtime_dependency(%q<ruby-feedparser>, [">= 0"])
       s.add_runtime_dependency(%q<sqlite3>, [">= 0"])
       s.add_runtime_dependency(%q<oauth>, [">= 0"])
+      s.add_runtime_dependency(%q<ruby-readability>, [">= 0"])
       s.add_development_dependency(%q<rspec>, ["~> 2.3.0"])
       s.add_development_dependency(%q<bundler>, ["~> 1.0.0"])
       s.add_development_dependency(%q<jeweler>, ["~> 1.5.2"])
@@ -75,6 +76,7 @@ Gem::Specification.new do |s|
       s.add_dependency(%q<ruby-feedparser>, [">= 0"])
       s.add_dependency(%q<sqlite3>, [">= 0"])
       s.add_dependency(%q<oauth>, [">= 0"])
+      s.add_dependency(%q<ruby-readability>, [">= 0"])
       s.add_dependency(%q<rspec>, ["~> 2.3.0"])
       s.add_dependency(%q<bundler>, ["~> 1.0.0"])
       s.add_dependency(%q<jeweler>, ["~> 1.5.2"])
@@ -88,6 +90,7 @@ Gem::Specification.new do |s|
     s.add_dependency(%q<ruby-feedparser>, [">= 0"])
     s.add_dependency(%q<sqlite3>, [">= 0"])
     s.add_dependency(%q<oauth>, [">= 0"])
+    s.add_dependency(%q<ruby-readability>, [">= 0"])
     s.add_dependency(%q<rspec>, ["~> 2.3.0"])
     s.add_dependency(%q<bundler>, ["~> 1.0.0"])
     s.add_dependency(%q<jeweler>, ["~> 1.5.2"])
