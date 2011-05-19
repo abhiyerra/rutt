@@ -7,6 +7,7 @@ gem "parallel"
 gem "ruby-feedparser"
 gem "sqlite3"
 gem "oauth"
+gem "ruby-readability", :require => 'readability'
 
 group :development do
   gem "rspec", "~> 2.3.0"

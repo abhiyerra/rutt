@@ -14,6 +14,8 @@ require 'feedparser'
 require 'parallel'
 require 'instapaper'
 require 'oauth'
+require 'readability'
+require 'open-uri'
 
 require 'rutt'
 

@@ -9,8 +9,13 @@ module Rutt
       end
 
       def display_content
-        @content = `elinks -dump -dump-charset ascii -force-html #{@item['url']}`
-        @content = @content.split("\n")
+#        @content = `elinks -dump -dump-charset ascii -force-html #{@item['url']}`
+        source = open(@item['url']).read
+        content = Nokogiri::HTML(::Readability::Document.new(source).content).text
+
+        @content = content.split("\n").map do |s|
+          s.gsub(/.{0,74}(?:\s|\Z)/){($& + 5.chr).gsub(/\n\005/,"\n")}.gsub(/((\n|^)[>|\s]*[>|].*?)\005/, "\\1").gsub(/\005/,"\n").split("\n") << "\n"
+        end.flatten
 
         @stdscr.addstr(" #{@item['title']} (#{@item['url']})\n\n")
 
