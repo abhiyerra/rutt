@@ -94,12 +94,13 @@ module Rutt
               DB::Feed::refresh_for(@feed)
               window
             when / /
-              content_screen = Content.new(@stdscr, @pages[@cur_page][@cur_y - 1])
+              cur_y = @cur_y - 1
+              content_screen = Content.new(@stdscr, @pages[@cur_page][cur_y])
               content_screen.loop
 
               get_items
               window
-              move_pointer(@cur_y, move_to=true)
+              move_pointer(cur_y + 1, move_to=true)
             end
           else
             case c

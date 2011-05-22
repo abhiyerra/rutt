@@ -62,11 +62,12 @@ module Rutt
 
               @stdscr.clear
               display_menu
-              feed = @feeds[cur_y]
+              feed = @pages[@cur_page][cur_y]
               @stdscr.move(2, 0)
               @stdscr.addstr("Are you sure you want to delete #{feed['title']}? ")
               d = @stdscr.getch
               DB::Feed::delete(feed) if d.chr =~ /y/i
+              get_feeds
               window
               move_pointer(cur_y, move_to=true)
             when /p/i
