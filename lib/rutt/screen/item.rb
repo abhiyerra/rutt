@@ -53,7 +53,7 @@ module Rutt
                 })
               DB::Item::sent_to_instapaper(@items[cur_y])
               window
-              move_pointer(@cur_y, move_to=true)
+              move_pointer(cur_y + 1, move_to=true)
             when /a/i
               DB::Feed::mark_as_read(@feed)
               window
