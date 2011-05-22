@@ -6,6 +6,10 @@ module Rutt
 
         @menu = "q:Quit d:delete r:refresh all"
 
+        get_feeds
+      end
+
+      def get_feeds
         @feeds = DB::Feed::all
         @pages = @feeds / @max_y
       end
@@ -77,6 +81,7 @@ module Rutt
               item_screen = Item.new(@stdscr, @pages[@cur_page][cur_y - 1])
               item_screen.loop
 
+              get_feeds
               window
               move_pointer(cur_y, move_to=true)
             end
