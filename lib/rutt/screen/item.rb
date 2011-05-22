@@ -54,14 +54,16 @@ module Rutt
             when /s/i
               cur_y = @cur_y - 1
               $instapaper.request('/api/1/bookmarks/add', {
-                  'url'   => @items[cur_y]['url'],
-                  'title' => @items[cur_y]['title'],
+                  'url'   => @pages[@cur_page][cur_y]['url'],
+                  'title' => @pages[@cur_page][cur_y]['title'],
                 })
-              DB::Item::sent_to_instapaper(@items[cur_y])
+              DB::Item::sent_to_instapaper(@pages[@cur_page][cur_y])
+              get_items
               window
               move_pointer(cur_y + 1, move_to=true)
             when /a/i
               DB::Feed::mark_as_read(@feed)
+              get_items
               window
               move_pointer(@cur_y, move_to=true)
             when /p/i
@@ -73,18 +75,18 @@ module Rutt
             when /b/i
               cur_y = @cur_y - 1
               DB::Item::mark_as_read(@items[cur_y])
-              Launchy.open(@items[cur_y]['url'])
+              Launchy.open(@pages[@cur_page][cur_y]['url'])
               window
               move_pointer(@cur_y, move_to=true)
             when /m/i
               cur_y = @cur_y - 1
-              DB::Item::mark_as_read(@items[cur_y])
+              DB::Item::mark_as_read(@pages[@cur_page][cur_y])
               get_items
               window
               move_pointer(cur_y + 1, move_to=true)
             when /u/i
               cur_y = @cur_y - 1
-              DB::Item::mark_as_unread(@items[cur_y])
+              DB::Item::mark_as_unread(@pages[@cur_page][cur_y])
               get_items
               window
               move_pointer(cur_y + 1, move_to=true)
@@ -92,7 +94,7 @@ module Rutt
               DB::Feed::refresh_for(@feed)
               window
             when / /
-              content_screen = Content.new(@stdscr, @items[@cur_y - 1])
+              content_screen = Content.new(@stdscr, @pages[@cur_page][@cur_y - 1])
               content_screen.loop
 
               get_items
