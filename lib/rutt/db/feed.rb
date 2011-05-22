@@ -32,12 +32,12 @@ module Rutt
         $db.execute("delete from feeds where id = ?", feed['id'])
       end
 
-      def all(min_limit=0, max_limit=-1)
+      def all
         $db.execute(%{
           select f.*,
               (select count(*) from items iu where iu.feed_id = f.id) as num_items,
               (select count(*) from items ir where ir.read = 0 and ir.feed_id = f.id) as unread
-          from feeds f where unread > 0 order by id desc limit #{min_limit},#{max_limit}
+          from feeds f where unread > 0 order by id desc
         })
       end
 

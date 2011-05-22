@@ -22,8 +22,8 @@ module Rutt
         })
       end
 
-      def all(feed, min_limit=0, max_limit=-1)
-        $db.execute("select * from items where feed_id = ? order by published_at desc limit #{min_limit},#{max_limit}", feed['id'])
+      def all(feed)
+        $db.execute("select * from items where feed_id = ? order by published_at desc", feed['id'])
       end
 
       def mark_as_unread(item)

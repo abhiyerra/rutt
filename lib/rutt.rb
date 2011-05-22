@@ -1,3 +1,4 @@
+require 'rutt/helper'
 require 'rutt/db/config'
 require 'rutt/db/feed'
 require 'rutt/db/item'

@@ -2,17 +2,19 @@ module Rutt
   module Screen
     class Item < Base
       def initialize(stdscr, feed)
+        super(stdscr)
+
         @feed = feed
         @menu = " i:quit r:refresh m:mark as read u:mark as unread a:mark all as read b:open in browser"
 
-        super(stdscr)
+        @items = DB::Item::all(@feed)
+        @pages = @items / @max_y
       end
 
       def display_items
         @cur_y = @min_y
 
-        @items = DB::Item::all(@feed, @min_limit, @max_limit)
-        @items.each do |item|
+        @pages[@cur_page].each do |item|
           item_status = case item['read'].to_i
                         when 0 then 'N'
                         when 1 then ' '

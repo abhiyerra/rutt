@@ -5,28 +5,24 @@ module Rutt
         @stdscr = stdscr
 
         @min_y = 1
-        @max_y = @stdscr.getmaxy
-
-        @min_limit = @min_y - 1
-        @max_limit = @max_y - 5
+        @max_y = @stdscr.getmaxy - 5
 
         @cur_y = 1
         @cur_x = 0
+
+        @pages = []
+        @cur_page = 0
       end
 
       def incr_page
-        @min_limit =  @max_limit
-        @max_limit += (@max_y - 5)
+        check_page = @cur_page + 1
+        check_page = @cur_page if check_page >= @pages.length
+        @cur_page = check_page
       end
 
       def decr_page
-        @max_limit =  @min_limit
-        @min_limit -= (@max_y - 5)
-
-        if @max_limit <= 0
-          @min_limit = @min_y - 1
-          @max_limit = @max_y - 5
-        end
+        @cur_page -= 1
+        @cur_page = 0 if @cur_page < 0
       end
 
       def display_menu

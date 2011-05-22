@@ -2,14 +2,12 @@ module Rutt
   module Screen
     class Content < Base
       def initialize(stdscr, item)
+        super(stdscr)
+
         @item = item
         @menu = "i:back b:open in browser"
 
-        super(stdscr)
-      end
-
-      def display_content
-#        @content = `elinks -dump -dump-charset ascii -force-html #{@item['url']}`
+        # Get the content
         source = open(@item['url']).read
         content = Nokogiri::HTML(::Readability::Document.new(source).content).text
 
@@ -17,10 +15,27 @@ module Rutt
           s.gsub(/.{0,74}(?:\s|\Z)/){($& + 5.chr).gsub(/\n\005/,"\n")}.gsub(/((\n|^)[>|\s]*[>|].*?)\005/, "\\1").gsub(/\005/,"\n").split("\n") << "\n"
         end.flatten
 
-        @stdscr.addstr(" #{@item['title']} (#{@item['url']})\n\n")
+        @pages = @content / @max_y
+      end
 
-        lines = @content[@min_limit..@max_limit]
-        lines.each { |line| @stdscr.addstr("  #{line}\n") } if lines
+      def display_content
+#        @content = `elinks -dump -dump-charset ascii -force-html #{@item['url']}`
+
+        @cur_y = @min_y
+        @stdscr.move(@cur_y, 0)
+        @stdscr.addstr(" #{@item['title']}\n")
+        @cur_y += 1
+        @stdscr.move(@cur_y, 0)
+        @stdscr.addstr(" #{@item['url']}\n")
+        @cur_y += 1
+
+        @pages[@cur_page].each do |line|
+          @stdscr.move(@cur_y, 0)
+          @stdscr.addstr("  #{line}\n")
+
+          @cur_y += 1
+        end
+        @cur_y = @min_y
 
         @stdscr.refresh
       end

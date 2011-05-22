@@ -2,16 +2,18 @@ module Rutt
   module Screen
     class Feed < Base
       def initialize(stdscr)
+        super(stdscr)
+
         @menu = "q:Quit d:delete r:refresh all"
 
-        super(stdscr)
+        @feeds = DB::Feed::all
+        @pages = @feeds / @max_y
       end
 
       def display_feeds
         @cur_y = @min_y
 
-        @feeds = DB::Feed::all(@min_limit, @max_limit)
-        @feeds.each do |feed|
+        @pages[@cur_page].each do |feed|
           #     next if feed['unread'] == 0  # This should be configurable: feed.showread
 
           @stdscr.move(@cur_y, 0)
@@ -60,9 +62,7 @@ module Rutt
               @stdscr.move(2, 0)
               @stdscr.addstr("Are you sure you want to delete #{feed['title']}? ")
               d = @stdscr.getch
-              if d.chr =~ /y/i
-                DB::Feed::delete(feed)
-              end
+              DB::Feed::delete(feed) if d.chr =~ /y/i
               window
               move_pointer(cur_y, move_to=true)
             when /p/i
@@ -73,8 +73,8 @@ module Rutt
               window
             when / /
               cur_y = @cur_y
-              @stdscr.addstr("#{@feeds[cur_y]}")
-              item_screen = Item.new(@stdscr, @feeds[cur_y - 1])
+              @stdscr.addstr("#{@pages[@cur_page][cur_y]}")
+              item_screen = Item.new(@stdscr, @pages[@cur_page][cur_y - 1])
               item_screen.loop
 
               window
