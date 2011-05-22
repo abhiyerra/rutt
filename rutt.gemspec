@@ -5,11 +5,11 @@
 
 Gem::Specification.new do |s|
   s.name = %q{rutt}
-  s.version = "0.4.0"
+  s.version = "0.4.1"
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.authors = ["Abhi Yerra"]
-  s.date = %q{2011-05-19}
+  s.date = %q{2011-05-22}
   s.default_executable = %q{rutt}
   s.description = %q{The Mutt of RSS/Atom feeds.}
   s.email = %q{abhi@berkeley.edu}
