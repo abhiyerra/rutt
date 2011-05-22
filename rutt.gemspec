@@ -5,7 +5,7 @@
 
 Gem::Specification.new do |s|
   s.name = %q{rutt}
-  s.version = "0.4.1"
+  s.version = "0.5.0"
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.authors = ["Abhi Yerra"]
@@ -32,6 +32,7 @@ Gem::Specification.new do |s|
     "lib/rutt/db/config.rb",
     "lib/rutt/db/feed.rb",
     "lib/rutt/db/item.rb",
+    "lib/rutt/helper.rb",
     "lib/rutt/opml.rb",
     "lib/rutt/screen.rb",
     "lib/rutt/screen/content.rb",
