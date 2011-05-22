@@ -7,6 +7,10 @@ module Rutt
         @feed = feed
         @menu = " i:quit r:refresh m:mark as read u:mark as unread a:mark all as read b:open in browser"
 
+        get_items
+      end
+
+      def get_items
         @items = DB::Item::all(@feed)
         @pages = @items / @max_y
       end
@@ -75,11 +79,13 @@ module Rutt
             when /m/i
               cur_y = @cur_y - 1
               DB::Item::mark_as_read(@items[cur_y])
+              get_items
               window
               move_pointer(cur_y + 1, move_to=true)
             when /u/i
               cur_y = @cur_y - 1
               DB::Item::mark_as_unread(@items[cur_y])
+              get_items
               window
               move_pointer(cur_y + 1, move_to=true)
             when /r/i
@@ -89,6 +95,7 @@ module Rutt
               content_screen = Content.new(@stdscr, @items[@cur_y - 1])
               content_screen.loop
 
+              get_items
               window
               move_pointer(@cur_y, move_to=true)
             end
