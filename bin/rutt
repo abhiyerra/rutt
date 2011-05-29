@@ -75,6 +75,15 @@ def main
       exit
     end
 
+    opts.on('-k', '--kindle FEED', 'Export feed to kindle.') do |feed_id|
+      feed = {
+        'id' => feed_id.to_i
+      }
+
+      Rutt::Share::Kindle.new(feed)
+
+      exit
+    end
 #    opts.on('-l', '--list-feeds', action='store_true', help="List the feeds")
 
   end.parse!

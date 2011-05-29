@@ -7,5 +7,6 @@ require 'rutt/screen/feed'
 require 'rutt/screen/item'
 require 'rutt/screen/content'
 require 'rutt/share/instapaper'
+require 'rutt/share/kindle'
 require 'rutt/opml'
 

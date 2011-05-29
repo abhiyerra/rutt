@@ -26,6 +26,10 @@ module Rutt
         $db.execute("select * from items where feed_id = ? order by published_at desc", feed['id'])
       end
 
+      def unread(feed, limit=10)
+        $db.execute("select * from items where feed_id = ? and read = 0 order by published_at desc limit #{limit}", feed['id'])
+      end
+
       def mark_as_unread(item)
         $db.execute("update items set read = 0 where id = #{item['id']}")
       end
